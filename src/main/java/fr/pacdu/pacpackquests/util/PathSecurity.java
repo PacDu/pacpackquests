@@ -93,8 +93,7 @@ public final class PathSecurity {
      * Format a string to be valid as a path :
      *  remove accents,
      *  replace spaces with underscores,
-     *  remove any character other than 'a' to 'z', '0' to '9' or '_',
-     *  if the result equals to a reserved Windows device name, add an extra underscore at the end.
+     *  remove any character other than 'a' to 'z', '0' to '9' or '_'.
      * @param str The string to format.
      * @return the formatted string.
      */

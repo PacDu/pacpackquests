@@ -2,7 +2,7 @@ package fr.pacdu.pacpackquests.client.screen;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.TaskType;
-import fr.pacdu.pacpackquests.config.ModConfig;
+import fr.pacdu.pacpackquests.client.config.ClientConfig;
 import fr.pacdu.pacpackquests.network.*;
 import fr.pacdu.pacpackquests.client.util.TranslationUtils;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -30,6 +30,8 @@ import java.util.regex.Pattern;
 
 import static fr.pacdu.pacpackquests.PacPackQuests.DEFAULT_CATEGORY_NAME;
 import static fr.pacdu.pacpackquests.client.PacPackQuestsClient.*;
+import static fr.pacdu.pacpackquests.config.ModConfig.maxGridColumns;
+import static fr.pacdu.pacpackquests.config.ModConfig.maxGridRows;
 
 public class QuestScreen extends AbstractQuestGridScreen {
 
@@ -63,7 +65,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	record GridPos(int x, int y) {}
 
 	public QuestScreen() {
-		super(Text.translatable("gui.pacpack-quests.quest_menu"));
+		super(Text.translatable("gui.pacpackquests.quest_menu"));
 	}
 
 	@Override
@@ -86,7 +88,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		);
 
 		// "Claim All" Button (Shifted right)
-		this.claimAllButton = ButtonWidget.builder(Text.translatable("gui.pacpack-quests.claim_all"), button -> claimAllQuests())
+		this.claimAllButton = ButtonWidget.builder(Text.translatable("gui.pacpackquests.claim_all"), button -> claimAllQuests())
 				.dimensions((this.width / 2) + 5, this.height - 35, buttonWidth, buttonHeight)
 				.build();
 
@@ -97,7 +99,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		// "Edit Mode" Toggle Button (Only visible if player is OP)
 		if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().player.getPermissions().hasPermission(DefaultPermissions.GAMEMASTERS)) {
 			this.addDrawableChild(
-					ButtonWidget.builder(Text.literal(I18n.translate("gui.pacpack-quests.edit") + ": " + (isEditMode ? "ON" : "OFF")).formatted(isEditMode ? Formatting.GREEN : Formatting.RED), button -> {
+					ButtonWidget.builder(Text.literal(I18n.translate("gui.pacpackquests.edit") + ": " + (isEditMode ? "ON" : "OFF")).formatted(isEditMode ? Formatting.GREEN : Formatting.RED), button -> {
 								this.isEditMode = !this.isEditMode;
 								this.clearAndInit(); // Refresh screen to update button text and visuals
 								this.clampPanning();
@@ -146,12 +148,12 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 	private void saveCurrentCameraState() {
 		if (selectedCategory != null) {
-			ModConfig.cameraPositions.put(selectedCategory, new ModConfig.CameraState(this.panX, this.panY, this.zoom));
+			ClientConfig.cameraPositions.put(selectedCategory, new ClientConfig.CameraState(this.panX, this.panY, this.zoom));
 		}
 	}
 
 	private void restoreCameraState(String category) {
-		ModConfig.CameraState state = ModConfig.cameraPositions.get(category);
+		ClientConfig.CameraState state = ClientConfig.cameraPositions.get(category);
 		if (state != null) {
 			this.panX = state.panX();
 			this.panY = state.panY();
@@ -413,15 +415,15 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			drawQuestTooltip(context, hoveredNode, mouseX, mouseY);
 		} else if (hoveredNode != null) {
 			List<Text> editTooltip = new ArrayList<>();
-			editTooltip.add(Text.translatable("gui.pacpack-quests.edit_action").formatted(Formatting.YELLOW, Formatting.BOLD));
-			editTooltip.add(Text.translatable("gui.pacpack-quests.click_drag").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpack-quests.to_move").formatted(Formatting.WHITE)));
-			editTooltip.add(Text.translatable("gui.pacpack-quests.right_click").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpack-quests.to_edit_delete").formatted(Formatting.WHITE)));
-			editTooltip.add(Text.translatable("gui.pacpack-quests.middle_click").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpack-quests.to_duplicate").formatted(Formatting.WHITE)));
+			editTooltip.add(Text.translatable("gui.pacpackquests.edit_action").formatted(Formatting.YELLOW, Formatting.BOLD));
+			editTooltip.add(Text.translatable("gui.pacpackquests.click_drag").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpackquests.to_move").formatted(Formatting.WHITE)));
+			editTooltip.add(Text.translatable("gui.pacpackquests.right_click").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpackquests.to_edit_delete").formatted(Formatting.WHITE)));
+			editTooltip.add(Text.translatable("gui.pacpackquests.middle_click").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpackquests.to_duplicate").formatted(Formatting.WHITE)));
 			context.drawTooltip(this.textRenderer, editTooltip, mouseX, mouseY);
 		} else if (hoveredDotX >= 0 && hoveredDotY >= 0 && isEditMode) {
 			List<Text> editTooltip = new ArrayList<>();
-			editTooltip.add(Text.translatable("gui.pacpack-quests.edit_action").formatted(Formatting.YELLOW, Formatting.BOLD));
-			editTooltip.add(Text.translatable("gui.pacpack-quests.right_click").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpack-quests.to_add").formatted(Formatting.WHITE)));
+			editTooltip.add(Text.translatable("gui.pacpackquests.edit_action").formatted(Formatting.YELLOW, Formatting.BOLD));
+			editTooltip.add(Text.translatable("gui.pacpackquests.right_click").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpackquests.to_add").formatted(Formatting.WHITE)));
 			context.drawTooltip(this.textRenderer, editTooltip, mouseX, mouseY);
 		}
 
@@ -469,32 +471,32 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		List<Text> tooltip = new ArrayList<>();
 
 		// 1. Title
-		tooltip.add(Text.translatable(quest.title()).formatted(Formatting.GOLD, Formatting.BOLD));
+		tooltip.add((I18n.hasTranslation(quest.title()) ? Text.translatable(quest.title()) : Text.literal(quest.title())).formatted(Formatting.GOLD, Formatting.BOLD));
 
 		// 2. Status and Progress
-		MutableText statusLabel = Text.translatable("gui.pacpack-quests.status").append(": ").formatted(Formatting.GRAY);
+		MutableText statusLabel = Text.translatable("gui.pacpackquests.status").append(": ").formatted(Formatting.GRAY);
 
 		if (claimed) {
-			tooltip.add(statusLabel.append(Text.translatable("gui.pacpack-quests.claimed").formatted(Formatting.GREEN)));
+			tooltip.add(statusLabel.append(Text.translatable("gui.pacpackquests.claimed").formatted(Formatting.GREEN)));
 		} else if (progress >= requiredAmount) {
-			tooltip.add(statusLabel.append(Text.translatable("gui.pacpack-quests.ready_to_claim").formatted(Formatting.YELLOW)));
+			tooltip.add(statusLabel.append(Text.translatable("gui.pacpackquests.ready_to_claim").formatted(Formatting.YELLOW)));
 		} else if (quest.isLocked()) {
-			tooltip.add(statusLabel.append(Text.translatable("gui.pacpack-quests.locked").formatted(Formatting.RED)));
+			tooltip.add(statusLabel.append(Text.translatable("gui.pacpackquests.locked").formatted(Formatting.RED)));
 		} else {
 			// Task target (e.g., Craft: Shield)
-			tooltip.add(Text.translatable("gui.pacpack-quests." + quest.taskType().toString().toLowerCase())
+			tooltip.add(Text.translatable("gui.pacpackquests." + quest.taskType().toString().toLowerCase())
 					.append(": ")
 					.append(Text.literal(TranslationUtils.getTranslatedName(quest.target(), TaskType.getRegistryType(quest.taskType()))))
 					.formatted(Formatting.GRAY));
 
 			// Progress (e.g., Progress: 0 / 1)
-			tooltip.add(Text.translatable("gui.pacpack-quests.progress")
+			tooltip.add(Text.translatable("gui.pacpackquests.progress")
 					.append(": " + progress + " / " + requiredAmount)
 					.formatted(Formatting.GRAY));
 		}
 
 		// 3. Reward
-		MutableText rewardLabel = Text.translatable("gui.pacpack-quests.reward").append(": ").formatted(Formatting.GRAY);
+		MutableText rewardLabel = Text.translatable("gui.pacpackquests.reward").append(": ").formatted(Formatting.GRAY);
 		tooltip.add(rewardLabel.append(TranslationUtils.getRewardText(quest.definition().primaryReward(), claimed)));
 
 		context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
@@ -547,8 +549,8 @@ public class QuestScreen extends AbstractQuestGridScreen {
 										}
 										this.client.setScreen(this);
 									},
-									Text.translatable("gui.pacpack-quests.delete_category_title"),
-									Text.translatable("gui.pacpack-quests.delete_category_desc").append(" " + category.toUpperCase() + " ?")
+									Text.translatable("gui.pacpackquests.delete_category_title"),
+									Text.translatable("gui.pacpackquests.delete_category_desc").append(" " + category.toUpperCase() + " ?")
 							));
 							return true;
 						}
@@ -967,7 +969,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	}
 
 	public void removeCategory(String categoryName) {
-		ModConfig.cameraPositions.remove(categoryName);
+		ClientConfig.cameraPositions.remove(categoryName);
 		// If the deleted category was the one open, we switch to another one
 		if (selectedCategory.equals(categoryName)) {
 			selectedCategory = CLIENT_CATEGORIES.isEmpty() ? DEFAULT_CATEGORY_NAME : CLIENT_CATEGORIES.getFirst();
@@ -980,9 +982,9 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	public void renameCategory(String oldName, String newName) {
 		int index = CLIENT_CATEGORIES.indexOf(oldName);
 		if (index >= 0) {
-			ModConfig.CameraState state = ModConfig.cameraPositions.remove(oldName);
+			ClientConfig.CameraState state = ClientConfig.cameraPositions.remove(oldName);
 			if (state != null) {
-				ModConfig.cameraPositions.put(newName, state);
+				ClientConfig.cameraPositions.put(newName, state);
 			}
 
 			List<String> newCategories = new ArrayList<>();
@@ -1000,6 +1002,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 			if (selectedCategory.equals(oldName))
 				selectedCategory = newName;
+			this.refreshUI();
 		}
 	}
 

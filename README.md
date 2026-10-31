@@ -30,5 +30,10 @@ Have an idea for a new feature, a new type of quest, or a cool reward mechanic? 
 
 Your feedback is incredibly valuable to help improve the mod!
 If you have a suggestion, an idea for the roadmap, or if you encounter a bug, please feel free to:
-* **Open an issue** on the [GitHub repository](https://github.com/PacDu/pacpack-quests/issues).
+* **Open an issue** on the [GitHub repository](https://github.com/PacDu/pacpackquests/issues).
 * **Come discuss** with me and the community on my [Discord server](https://discord.gg/U3gYa2YuQd).
+
+
+Notes :
+Reward amount : <= 256 pour les commandes pour éviter les crashs serveur
+Required et reward amount : <= 2304 pour les items car c'est le nombre max d'items dans un inventaire minecraft standard (4*9*64)

@@ -8,6 +8,9 @@ import net.minecraft.text.Text;
 
 import java.util.List;
 
+import static fr.pacdu.pacpackquests.config.ModConfig.maxGridColumns;
+import static fr.pacdu.pacpackquests.config.ModConfig.maxGridRows;
+
 public abstract class AbstractQuestGridScreen extends Screen {
 
     protected int windowWidth, windowHeight, startX, startY;
@@ -25,10 +28,6 @@ public abstract class AbstractQuestGridScreen extends Screen {
     protected int tabWidth = 90;
     protected final int tabHeight = 20;
     protected final int categoryNameMaxChars = 32;
-
-    // Grid size for edit mode constraints
-    protected int maxGridColumns = 20;
-    protected int maxGridRows = 20;
 
     protected String draggedQuestId = null;
 

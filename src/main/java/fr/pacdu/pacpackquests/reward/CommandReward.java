@@ -2,6 +2,7 @@ package fr.pacdu.pacpackquests.reward;
 
 import fr.pacdu.pacpackquests.PacPackQuests;
 import fr.pacdu.pacpackquests.RewardType;
+import net.minecraft.command.permission.LeveledPermissionPredicate;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.network.PacketByteBuf;
@@ -30,10 +31,11 @@ public record CommandReward(String command, String description, int amount) impl
                 .withPosition(player.getEntityPos())
                 .withRotation(player.getRotationClient())
                 .withWorld(player.getEntityWorld())
+                .withPermissions(LeveledPermissionPredicate.GAMEMASTERS)
                 .withSilent();
 
         try {
-            for (int i = 0; i < amount; i++) {
+            for (int i = 0; i < Math.min(amount, 256); i++) {
                 server.getCommandManager().getDispatcher().execute(cleanCommand, source);
             }
         } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {

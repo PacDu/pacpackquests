@@ -267,7 +267,7 @@ public class QuestManager {
         }
 
         if (!errorMessage.isEmpty()) {
-            errorMessage.deleteCharAt(0).deleteCharAt(errorMessage.length() - 1).insert(0, "There are errors in the json file of quest \"" + questId + "\" : ");
+            errorMessage.deleteCharAt(0).insert(0, "There are errors in the json file of quest \"" + questId + "\" : ").deleteCharAt(errorMessage.length() - 1);
             PacPackQuests.LOGGER.warn(errorMessage.toString());
             return;
         }

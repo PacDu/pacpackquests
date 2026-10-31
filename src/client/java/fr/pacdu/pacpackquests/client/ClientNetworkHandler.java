@@ -1,14 +1,12 @@
 package fr.pacdu.pacpackquests.client;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
+import fr.pacdu.pacpackquests.client.config.ClientConfig;
 import fr.pacdu.pacpackquests.client.screen.QuestScreen;
 import fr.pacdu.pacpackquests.client.screen.SelectionScreen;
-import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.network.*;
-import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.item.ItemStack;
 
 import java.util.List;
 
@@ -22,30 +20,9 @@ public class ClientNetworkHandler {
             var registries = client.world != null ? client.world.getRegistryManager() : (client.getServer() != null ? client.getServer().getRegistryManager() : null);
             QuestDefinition def = payload.toDefinition(registries);
             PacPackQuestsClient.CLIENT_DEFINITIONS.put(payload.questId(), def);
-
-            for (QuestDefinition quest : PacPackQuestsClient.CLIENT_DEFINITIONS.values()) {
-                if (!PacPackQuestsClient.CLIENT_CATEGORIES.contains(quest.category())) {
-                    PacPackQuestsClient.CLIENT_CATEGORIES.add(quest.category());
-                }
+            if (!PacPackQuestsClient.CLIENT_CATEGORIES.contains(def.category())) {
+                PacPackQuestsClient.CLIENT_CATEGORIES.add(def.category());
             }
-
-            List<String> configuredOrder = ModConfig.categoryOrder;
-            for (String category : configuredOrder) {
-                if (!PacPackQuestsClient.CLIENT_CATEGORIES.contains(category)) {
-                    PacPackQuestsClient.CLIENT_CATEGORIES.add(category);
-                }
-            }
-
-            // Config-based sorting
-            PacPackQuestsClient.CLIENT_CATEGORIES.sort((cat1, cat2) -> {
-                int index1 = configuredOrder.indexOf(cat1);
-                int index2 = configuredOrder.indexOf(cat2);
-
-                if (index1 == -1 && index2 == -1) return cat1.compareTo(cat2);
-                if (index1 == -1) return 1;
-                if (index2 == -1) return -1;
-                return Integer.compare(index1, index2);
-            });
 
             if (context.client().currentScreen instanceof QuestScreen qs) qs.refreshUI();
         }));
@@ -80,7 +57,7 @@ public class ClientNetworkHandler {
         ClientPlayNetworking.registerGlobalReceiver(DeleteCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
             PacPackQuestsClient.CLIENT_DEFINITIONS.entrySet().removeIf(entry -> entry.getValue().category().equals(payload.category()));
             PacPackQuestsClient.CLIENT_CATEGORIES.remove(payload.category());
-            ModConfig.cameraPositions.remove(payload.category());
+            ClientConfig.cameraPositions.remove(payload.category());
 
             if (context.client().currentScreen instanceof QuestScreen questScreen) {
                 questScreen.removeCategory(payload.category());
@@ -89,8 +66,6 @@ public class ClientNetworkHandler {
 
         ClientPlayNetworking.registerGlobalReceiver(ReorderCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
             PacPackQuestsClient.CLIENT_CATEGORIES.clear();
-            PacPackQuestsClient.SERVER_STRUCTURES.clear();
-            PacPackQuestsClient.SERVER_LOOT_TABLES.clear();
             PacPackQuestsClient.CLIENT_CATEGORIES.addAll(payload.categories());
             if (context.client().currentScreen instanceof QuestScreen questScreen) {
                 questScreen.refreshUI();
@@ -105,9 +80,9 @@ public class ClientNetworkHandler {
                 }
             }
 
-            ModConfig.CameraState state = ModConfig.cameraPositions.remove(payload.categoryOld());
+            ClientConfig.CameraState state = ClientConfig.cameraPositions.remove(payload.categoryOld());
             if (state != null) {
-                ModConfig.cameraPositions.put(payload.categoryNew(), state);
+                ClientConfig.cameraPositions.put(payload.categoryNew(), state);
             }
 
             if (context.client().currentScreen instanceof QuestScreen questScreen) {

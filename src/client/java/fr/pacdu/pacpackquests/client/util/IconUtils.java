@@ -37,7 +37,7 @@ public class IconUtils {
             return ICON_CACHE.get(cacheKey);
         }
 
-        ItemStack result = computeRepresentativeItem(target, type);
+        ItemStack result = computeRepresentativeItem(target, type).copy();
         ICON_CACHE.put(cacheKey, result);
         return result;
     }

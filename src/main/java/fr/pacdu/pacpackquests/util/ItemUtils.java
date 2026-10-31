@@ -15,6 +15,8 @@ import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.util.Identifier;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -25,6 +27,7 @@ import java.util.Optional;
 public final class ItemUtils {
 
     private static RegistryWrapper.WrapperLookup STATIC_LOOKUP;
+    private static final Map<String, ItemStack> STACK_CACHE = new HashMap<>();
 
     public static RegistryWrapper.WrapperLookup getStaticLookup() {
         if (STATIC_LOOKUP == null) {
@@ -131,7 +134,13 @@ public final class ItemUtils {
 
         // 2. Target with components [...]
         if (target.contains("[")) {
-            ItemStack targetStack = fromCommandString(target, registries);
+            ItemStack targetStack;
+            if (STACK_CACHE.containsKey(target)) {
+                targetStack = STACK_CACHE.get(target);
+            } else {
+                targetStack = fromCommandString(target, registries);
+                STACK_CACHE.put(target, targetStack);
+            }
             if (targetStack.isEmpty()) return false;
             return matchesComponents(playerStack, targetStack);
         }

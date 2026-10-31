@@ -1,6 +1,6 @@
 {
 	"schemaVersion": 1,
-	"id": "pacpack-quests",
+	"id": "pacpackquests",
 	"version": "${version}",
 	"name": "PacPack Quests",
 	"description": "A lightweight, fully in-game questing system for Fabric. Create, edit, and organize drag-and-drop quest trees directly from the game, with full multiplayer synchronization.",
@@ -8,11 +8,11 @@
 		"PacDu"
 	],
 	"contact": {
-		"homepage": "https://modrinth.com/modpack/pacpack-quests",
-		"sources": "https://github.com/PacDu/pacpack-quests"
+		"homepage": "https://modrinth.com/modpack/pacpackquests",
+		"sources": "https://github.com/PacDu/pacpackquests"
 	},
 	"license": "MIT",
-	"icon": "assets/pacpack-quests/icon.png",
+	"icon": "assets/pacpackquests/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
@@ -23,7 +23,7 @@
 		]
 	},
 	"mixins": [
-		"pacpack-quests.mixins.json"
+		"pacpackquests.mixins.json"
 	],
 	"depends": {
 		"fabricloader": ">=0.19.3",

@@ -33,10 +33,10 @@ public class QuestProgressHandler {
         }
 
         int current = state.getProgress(playerId, quest.id());
+        if (isIncrementation) amount = current + amount;
+        int newProgress = Math.clamp(amount, current, quest.requiredAmount());
 
-        if (current < quest.requiredAmount()) {
-            if (isIncrementation) amount = current + amount;
-            int newProgress = Math.clamp(amount, current, quest.requiredAmount());
+        if (current < quest.requiredAmount() && newProgress != current) {
             boolean isFinished = newProgress >= quest.requiredAmount();
             state.setProgress(player, quest.id(), newProgress);
 

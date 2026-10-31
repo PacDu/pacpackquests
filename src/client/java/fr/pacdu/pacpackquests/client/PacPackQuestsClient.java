@@ -1,8 +1,8 @@
 package fr.pacdu.pacpackquests.client;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
+import fr.pacdu.pacpackquests.client.config.ClientConfig;
 import fr.pacdu.pacpackquests.client.screen.QuestScreen;
-import fr.pacdu.pacpackquests.config.ModConfig;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -30,14 +30,14 @@ public class PacPackQuestsClient implements ClientModInitializer {
 	public static final List<String> SERVER_STRUCTURES = new ArrayList<>();
 	public static final List<String> SERVER_LOOT_TABLES = new ArrayList<>();
 
-	public static final KeyBinding.Category QUEST_CATEGORY_KEY = KeyBinding.Category.create(Identifier.of("pacpack-quests", "keys"));
+	public static final KeyBinding.Category QUEST_CATEGORY_KEY = KeyBinding.Category.create(Identifier.of("pacpackquests", "keys"));
 
 	@Override
 	public void onInitializeClient() {
-		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> ModConfig.load());
+		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> ClientConfig.load());
 
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-			ModConfig.save();
+			ClientConfig.save();
             CLIENT_DEFINITIONS.clear();
             CLIENT_PROGRESS.clear();
             CLIENT_FINISHED.clear();
@@ -47,10 +47,10 @@ public class PacPackQuestsClient implements ClientModInitializer {
             SERVER_LOOT_TABLES.clear();
         });
 
-		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> ModConfig.save());
+		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> ClientConfig.save());
 
 		openQuestMenuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-				"key.pacpack-quests.open-quest-menu",
+				"key.pacpackquests.open-quest-menu",
 				InputUtil.Type.KEYSYM,
 				GLFW.GLFW_KEY_O,
 				QUEST_CATEGORY_KEY

@@ -1,6 +1,7 @@
 package fr.pacdu.pacpackquests.client.screen;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
+import fr.pacdu.pacpackquests.client.PacPackQuestsClient;
 import fr.pacdu.pacpackquests.client.util.DrawUtils;
 import fr.pacdu.pacpackquests.util.ItemUtils;
 import net.minecraft.client.MinecraftClient;
@@ -13,6 +14,8 @@ import net.minecraft.util.Formatting;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 
 import static fr.pacdu.pacpackquests.client.PacPackQuestsClient.CLIENT_DEFINITIONS;
 
@@ -22,6 +25,7 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
     private final String questId; // The quest we are editing (so we can't select it as a parent)
     private final String currentCategory;
     private final List<String> selectedParents;
+    private final Set<String> invalidDescendants = new HashSet<>();
 
     // Use the GridNode interface defined in AbstractQuestGridScreen
     record SelectionNode(String id, String title, int x, int y, List<String> parents, ItemStack icon) implements GridNode {
@@ -39,7 +43,7 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
     private final String tempIcon;
 
     public ParentSelectionScreen(EditQuestScreen parentScreen, String questId, String currentCategory, List<String> initialParents, String tempTitle, int tempX, int tempY, String tempIcon) {
-        super(Text.translatable("gui.pacpack-quests.select_parents"));
+        super(Text.translatable("gui.pacpackquests.select_parents"));
         this.parentScreen = parentScreen;
         this.questId = questId;
         this.currentCategory = currentCategory;
@@ -109,6 +113,13 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
         } else {
             centerOn(canvasOffsetX + (this.tempX * gridSpacing) + 16, canvasOffsetY + (this.tempY * gridSpacing) + 16);
         }
+
+        this.invalidDescendants.clear();
+        for (SelectionNode node : this.nodes) {
+            if (isDescendant(node.id(), this.questId, new HashSet<>())) {
+                this.invalidDescendants.add(node.id());
+            }
+        }
     }
 
     @Override
@@ -127,7 +138,7 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
                 for (SelectionNode node : nodes) {
                     if (isHoveringNode(node.x(), node.y(), localMouseX, localMouseY)) {
                         // Prevent selecting the quest itself or its descendants as a parent
-                        if (node.id().equals(questId) || isDescendant(node.id(), questId, new java.util.HashSet<>())) return true;
+                        if (node.id().equals(questId) || this.invalidDescendants.contains(node.id())) return true;
 
                         if (selectedParents.contains(node.id())) {
                             selectedParents.remove(node.id());
@@ -147,7 +158,7 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
         super.render(context, mouseX, mouseY, delta);
 
         // Share the background framing logic with QuestScreen
-        drawBackgroundFrame(context, Text.translatable("gui.pacpack-quests.select_parents"));
+        drawBackgroundFrame(context, Text.translatable("gui.pacpackquests.select_parents"));
         
         // Category tab logic
         int tabX = startX - tabWidth;
@@ -215,9 +226,9 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
             tooltip.add(Text.literal(hoveredNode.title()).formatted(Formatting.GOLD, Formatting.BOLD));
             tooltip.add(Text.literal(hoveredNode.id()).formatted(Formatting.GRAY));
             if (hoveredNode.id().equals(questId)) {
-                tooltip.add(Text.translatable("gui.pacpack-quests.cannot_select_self").formatted(Formatting.RED));
-            } else if (isDescendant(hoveredNode.id(), questId, new java.util.HashSet<>())) {
-                tooltip.add(Text.translatable("gui.pacpack-quests.cannot_select_child").formatted(Formatting.RED));
+                tooltip.add(Text.translatable("gui.pacpackquests.cannot_select_self").formatted(Formatting.RED));
+            } else if (this.invalidDescendants.contains(hoveredNode.id())) {
+                tooltip.add(Text.translatable("gui.pacpackquests.cannot_select_child").formatted(Formatting.RED));
             }
             context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
         } else if (isTruncated && mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= tabY && mouseY <= tabY + tabHeight) {
@@ -227,7 +238,7 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
 
     private void renderNode(DrawContext context, SelectionNode node, double localMouseX, double localMouseY) { //
         boolean isSelected = selectedParents.contains(node.id());
-        boolean isDescendant = isDescendant(node.id(), questId, new java.util.HashSet<>());
+        boolean isDescendant = this.invalidDescendants.contains(node.id());
         int bgColor = 0xFF555555;
         
         if (isHoveringNode(node.x(), node.y(), localMouseX, localMouseY)) {
@@ -250,11 +261,11 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
         }
     }
 
-    private boolean isDescendant(String potentialParentId, String targetAncestorId, java.util.Set<String> visited) {
+    private boolean isDescendant(String potentialParentId, String targetAncestorId, Set<String> visited) {
         if (potentialParentId.equals(targetAncestorId)) return true;
         if (!visited.add(potentialParentId)) return false;
 
-        fr.pacdu.pacpackquests.QuestDefinition def = fr.pacdu.pacpackquests.client.PacPackQuestsClient.CLIENT_DEFINITIONS.get(potentialParentId);
+        QuestDefinition def = PacPackQuestsClient.CLIENT_DEFINITIONS.get(potentialParentId);
         if (def != null && def.parents() != null) {
             for (String parentId : def.parents()) {
                 if (isDescendant(parentId, targetAncestorId, visited)) return true;

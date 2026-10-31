@@ -37,7 +37,8 @@ public class CraftingResultSlotMixin {
                     boolean isTarget = ItemUtils.matches(stack, target, serverPlayer.getEntityWorld().getRegistryManager());
                     if (isTarget) {
                         // “this.amount” contains the exact number of items selected (required for Shift-click)
-                        QuestProgressHandler.incrementProgress(serverPlayer, quest, this.amount);
+                        int count = this.amount > 0 ? this.amount : stack.getCount();
+                        QuestProgressHandler.incrementProgress(serverPlayer, quest, count);
                     }
                 }
             }

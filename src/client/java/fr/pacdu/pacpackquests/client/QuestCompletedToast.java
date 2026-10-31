@@ -5,10 +5,8 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.toast.Toast;
 import net.minecraft.client.toast.ToastManager;
-import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -60,7 +58,7 @@ public class QuestCompletedToast implements Toast {
         context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, BACKGROUND_TEXTURE, 0, 0, this.getWidth(), this.getHeight());
 
         // Draw Title ("Quest Completed!" in yellow)
-        Text title = Text.translatable("toast.pacpack-quests.completed").formatted(Formatting.YELLOW, Formatting.BOLD);
+        Text title = Text.translatable("toast.pacpackquests.completed").formatted(Formatting.YELLOW, Formatting.BOLD);
         context.drawText(textRenderer, title, 30, 7, 0xFFFFFF00, false);
 
         // Draw Subtitle (The actual name of the quest in white)

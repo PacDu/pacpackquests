@@ -65,7 +65,7 @@ public class SelectionScreen extends Screen {
     private boolean isReward = false;
 
     public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected, String previouslySelectedEntry) {
-        super(Text.translatable("gui.pacpack-quests.select_element"));
+        super(Text.translatable("gui.pacpackquests.select_element"));
         this.parent = parent;
         this.contextType = contextType;
         this.onSelected = onSelected;
@@ -94,13 +94,13 @@ public class SelectionScreen extends Screen {
         int searchWidth = 160;
         this.searchBox = new TextFieldWidget(this.textRenderer, (this.width - searchWidth) / 2, 20, searchWidth, 20, Text.empty());
         this.searchBox.setMaxLength(128);
-        this.searchBox.setPlaceholder(Text.translatable("gui.pacpack-quests.search").formatted(Formatting.DARK_GRAY));
+        this.searchBox.setPlaceholder(Text.translatable("gui.pacpackquests.search").formatted(Formatting.DARK_GRAY));
         this.searchBox.setChangedListener(this::updateSearch);
         this.addDrawableChild(this.searchBox);
         this.setFocused(this.searchBox);
 
         // 2. Cancel Button
-        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.pacpack-quests.cancel"), button -> this.client.setScreen(this.parent))
+        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.pacpackquests.cancel"), button -> this.client.setScreen(this.parent))
                 .dimensions((this.width - 100) / 2, this.height - 30, 100, 20).build());
 
         // 3. Populate initial data based on context
@@ -297,6 +297,7 @@ public class SelectionScreen extends Screen {
             addEntry(id);
         }
         this.allEntries.sort(this::compareEntries);
+        removeEntry(this.previouslySelectedEntry);
         addEntry(this.previouslySelectedEntry, true);
         this.updateSearch(this.searchBox != null ? this.searchBox.getText() : "");
     }
@@ -396,9 +397,9 @@ public class SelectionScreen extends Screen {
                 String countStr = count >= 0 ? Integer.toString(count) : "?";
 
                 tooltip.add(Text.literal(hoveredEntry.displayName).formatted(Formatting.GOLD));
-                tooltip.add(Text.translatable("gui.pacpack-quests.tag")
+                tooltip.add(Text.translatable("gui.pacpackquests.tag")
                         .append(Text.literal(" (" + countStr + " "))
-                        .append(Text.translatable("registry.pacpack-quests." + contextType.name().toLowerCase(Locale.ROOT)))
+                        .append(Text.translatable("registry.pacpackquests." + contextType.name().toLowerCase(Locale.ROOT)))
                         .append(Text.literal(")"))
                         .formatted(Formatting.GRAY));
             } else if (!hoveredEntry.stack.isEmpty() && contextType == RegistryType.ITEM) {

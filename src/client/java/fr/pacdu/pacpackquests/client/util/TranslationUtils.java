@@ -32,7 +32,7 @@ public class TranslationUtils {
 
         MutableText text = switch (reward) {
             case XpReward xr -> Text.literal(xr.amount() + " XP");
-            case LevelReward lr -> Text.literal(lr.amount() + " ").append(Text.translatable("gui.pacpack-quests.levels"));
+            case LevelReward lr -> Text.literal(lr.amount() + " ").append(Text.translatable("gui.pacpackquests.levels"));
             case ItemReward ir -> Text.literal(ir.amount() + "x ").append(getTranslatedRewardName(ir.target(), RegistryType.ITEM));
             case CommandReward cr -> {
                 if (cr.description() != null && !cr.description().isBlank()) {

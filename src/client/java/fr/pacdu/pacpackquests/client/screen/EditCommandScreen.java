@@ -10,9 +10,7 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import org.jspecify.annotations.Nullable;
 
-import java.awt.*;
 import java.util.function.BiConsumer;
 
 public class EditCommandScreen extends Screen {
@@ -26,7 +24,7 @@ public class EditCommandScreen extends Screen {
     private ChatInputSuggestor commandSuggestor;
 
     protected EditCommandScreen(Screen parent, String previousCommand, String previousDescription, BiConsumer<String, String> onEdited) {
-        super(Text.translatable("gui.pacpack-quests.edit_command"));
+        super(Text.translatable("gui.pacpackquests.edit_command"));
         this.parent = parent;
         this.previousCommand = previousCommand;
         this.previousDescription = previousDescription;
@@ -42,7 +40,7 @@ public class EditCommandScreen extends Screen {
         this.commandField = new TextFieldWidget(this.textRenderer, (this.width - commandFieldWidth) / 2, 50, commandFieldWidth, 20, Text.empty());
         this.commandField.setMaxLength(16384);
         this.commandField.setText(this.previousCommand);
-        this.commandField.setPlaceholder(Text.translatable("form.pacpack-quests.reward_command_placeholder").formatted(Formatting.DARK_GRAY));
+        this.commandField.setPlaceholder(Text.translatable("form.pacpackquests.reward_command_placeholder").formatted(Formatting.DARK_GRAY));
         this.commandField.setChangedListener(text -> this.commandSuggestor.refresh());
         this.addDrawableChild(this.commandField);
 
@@ -56,9 +54,9 @@ public class EditCommandScreen extends Screen {
         this.commandDescriptionField.setText(this.previousDescription != null ? this.previousDescription : "");
         this.addDrawableChild(this.commandDescriptionField);
 
-        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.pacpack-quests.cancel"), button -> this.client.setScreen(this.parent))
+        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.pacpackquests.cancel"), button -> this.client.setScreen(this.parent))
                 .dimensions((this.width - 100) / 2 - 60, this.height - 30, 100, 20).build());
-        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.pacpack-quests.validate"), button -> {
+        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.pacpackquests.validate"), button -> {
             this.onEdited.accept(this.commandField.getText(), this.commandDescriptionField.getText());
             this.client.setScreen(this.parent);
         }).dimensions((this.width - 100) / 2 + 60, this.height - 30, 100, 20).build());
@@ -69,8 +67,8 @@ public class EditCommandScreen extends Screen {
         super.render(context, mouseX, mouseY, deltaTicks);
         context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 15, 0xFFFFFFFF);
 
-        context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.command").append(Text.literal(" *").formatted(Formatting.RED)), this.commandField.getX(), this.commandField.getY() - 10, 0xFFFFFFFF, true);
-        context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.command_description"), this.commandDescriptionField.getX(), this.commandDescriptionField.getY() - 10, 0xFFFFFFFF, true);
+        context.drawText(this.textRenderer, Text.translatable("form.pacpackquests.command").append(Text.literal(" *").formatted(Formatting.RED)), this.commandField.getX(), this.commandField.getY() - 10, 0xFFFFFFFF, true);
+        context.drawText(this.textRenderer, Text.translatable("form.pacpackquests.command_description"), this.commandDescriptionField.getX(), this.commandDescriptionField.getY() - 10, 0xFFFFFFFF, true);
 
         if (this.commandField.isFocused()) {
             this.commandSuggestor.render(context, mouseX, mouseY);

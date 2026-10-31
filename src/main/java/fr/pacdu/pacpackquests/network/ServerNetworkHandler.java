@@ -17,12 +17,10 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 import static fr.pacdu.pacpackquests.PacPackQuests.DEFAULT_CATEGORY_NAME;
 
@@ -59,6 +57,7 @@ public class ServerNetworkHandler {
         // Move Quest Node
         ServerPlayNetworking.registerGlobalReceiver(MoveQuestPayload.ID, (payload, context) -> context.server().execute(() -> {
             if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
+            if (payload.newX() < 0 || payload.newY() < 0 || payload.newX() >= ModConfig.maxGridColumns || payload.newY() >= ModConfig.maxGridRows) return;
 
             QuestDefinition quest = QuestManager.LOADED_QUESTS.get(payload.questId());
             if (quest == null) return;
@@ -121,12 +120,20 @@ public class ServerNetworkHandler {
                     context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, new DeleteQuestPayload(payload.questId())));
 
                     // Remove it from the parents of quests that has it as a parent
-                    QuestManager.LOADED_QUESTS.forEach((id, questDefinition) -> {
-                        if (questDefinition.parents().remove(payload.questId()) && QuestManager.saveQuest(questDefinition, context.server().getRegistryManager())) {
-                            QuestSyncPayload syncPacket = new QuestSyncPayload(questDefinition, context.server().getRegistryManager());
+                    List<QuestDefinition> questsToUpdate = new ArrayList<>();
+                    for (QuestDefinition q : QuestManager.LOADED_QUESTS.values()) {
+                        if (q.parents() != null && q.parents().remove(payload.questId())) {
+                            questsToUpdate.add(q);
+                        }
+                    }
+
+                    // Save updated quests
+                    for (QuestDefinition q : questsToUpdate) {
+                        if (QuestManager.saveQuest(q, context.server().getRegistryManager())) {
+                            QuestSyncPayload syncPacket = new QuestSyncPayload(q, context.server().getRegistryManager());
                             context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, syncPacket));
                         }
-                    });
+                    }
                 } catch (Exception e) {
                     PacPackQuests.LOGGER.error("Failed to delete quest", e);
                 }
@@ -172,11 +179,24 @@ public class ServerNetworkHandler {
             try {
                 File dir = categoryDir.toFile();
                 if (dir.exists() && dir.isDirectory()) {
-                    File[] files = dir.listFiles((d, name) -> name.endsWith(".json"));
-                    if (files != null) {
-                        for (File file : files) file.delete();
+                    File[] jsonFiles = dir.listFiles((d, name) -> name.endsWith(".json"));
+                    if (jsonFiles != null) {
+                        for (File file : jsonFiles) {
+                            if (!file.delete()) {
+                                PacPackQuests.LOGGER.warn("Could not delete quest file {}", file);
+                            }
+                        }
                     }
-                    dir.delete();
+                    try (var stream = Files.walk(categoryDir)) {
+                        stream.sorted(Comparator.reverseOrder())
+                                .forEach(path -> {
+                                    try {
+                                        Files.delete(path);
+                                    } catch (IOException e) {
+                                        PacPackQuests.LOGGER.warn("Could not delete file or directory {}: {}", path, e.getMessage());
+                                    }
+                                });
+                    }
                 }
 
                 ModConfig.categoryOrder.remove(categoryToDelete);
@@ -259,7 +279,9 @@ public class ServerNetworkHandler {
                 File dir = categoryDirOld.toFile();
                 if (dir.exists() && dir.isDirectory()) {
                     File newDir = categoryDirNew.toFile();
-                    dir.renameTo(newDir);
+                    if (!dir.renameTo(newDir)) {
+                        throw new IOException("Failed to rename category dir " + categoryDirOld + " to " + categoryDirNew);
+                    }
                 }
 
                 List<QuestDefinition> questsToUpdate = new ArrayList<>();

@@ -50,6 +50,7 @@ public class QuestState extends PersistentState {
 
     public boolean isFinished(UUID player, String questId) {
         QuestDefinition quest = QuestManager.LOADED_QUESTS.get(questId);
+        if (quest == null) return false;
         int currentProgress = getProgress(player, quest.id());
         return currentProgress >= quest.requiredAmount();
     }

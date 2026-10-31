@@ -10,9 +10,7 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static fr.pacdu.pacpackquests.PacPackQuests.DEFAULT_CATEGORY_NAME;
 
@@ -21,9 +19,8 @@ public class ModConfig {
     private static final Path CONFIG_FILE = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/categories.json");
 
     public static List<String> categoryOrder = new ArrayList<>();
-    public static Map<String, CameraState> cameraPositions = new HashMap<>();
-
-    public record CameraState(double panX, double panY, float zoom) {}
+    public static int maxGridColumns = 20;
+    public static int maxGridRows = 20;
 
     public static void load() {
         try {
@@ -38,21 +35,6 @@ public class ModConfig {
                                 String cat = element.getAsString();
                                 if (PathSecurity.isValidIdentifier(cat)) {
                                     categoryOrder.add(cat);
-                                }
-                            }
-                        }
-
-                        if (json.has("cameraPositions") && json.get("cameraPositions").isJsonObject()) {
-                            cameraPositions.clear();
-                            JsonObject camObj = json.getAsJsonObject("cameraPositions");
-                            for (Map.Entry<String, JsonElement> entry : camObj.entrySet()) {
-                                String cat = entry.getKey();
-                                if (PathSecurity.isValidIdentifier(cat) && entry.getValue().isJsonObject()) {
-                                    JsonObject c = entry.getValue().getAsJsonObject();
-                                    double pX = c.has("panX") ? c.get("panX").getAsDouble() : 0.0;
-                                    double pY = c.has("panY") ? c.get("panY").getAsDouble() : 0.0;
-                                    float z = c.has("zoom") ? c.get("zoom").getAsFloat() : 1.0f;
-                                    cameraPositions.put(cat, new CameraState(pX, pY, z));
                                 }
                             }
                         }
@@ -72,18 +54,6 @@ public class ModConfig {
             Files.createDirectories(CONFIG_FILE.getParent());
             JsonObject json = new JsonObject();
             json.add("categoryOrder", GSON.toJsonTree(categoryOrder));
-
-            if (!cameraPositions.isEmpty()) {
-                JsonObject camObj = new JsonObject();
-                for (Map.Entry<String, CameraState> entry : cameraPositions.entrySet()) {
-                    JsonObject c = new JsonObject();
-                    c.addProperty("panX", entry.getValue().panX());
-                    c.addProperty("panY", entry.getValue().panY());
-                    c.addProperty("zoom", entry.getValue().zoom());
-                    camObj.add(entry.getKey(), c);
-                }
-                json.add("cameraPositions", camObj);
-            }
 
             try (Writer writer = Files.newBufferedWriter(CONFIG_FILE)) {
                 GSON.toJson(json, writer);

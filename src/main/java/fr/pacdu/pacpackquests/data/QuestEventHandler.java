@@ -8,6 +8,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.Block;
 import net.minecraft.block.entity.LootableContainerBlockEntity;
 import net.minecraft.entity.EntityType;
@@ -26,13 +27,11 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 
 import fr.pacdu.pacpackquests.util.ItemUtils;
-import java.util.HashMap;
-import java.util.Map;
+
+import java.lang.reflect.Method;
 import java.util.UUID;
 
 public class QuestEventHandler {
-
-    private static final Map<UUID, Map<String, Integer>> previousTickInventory = new HashMap<>();
 
     private QuestEventHandler() {}
 
@@ -46,7 +45,9 @@ public class QuestEventHandler {
                         String target = quest.target();
 
                         if (target.startsWith("#")) {
-                            TagKey<Block> tag = TagKey.of(RegistryKeys.BLOCK, Identifier.of(target.substring(1)));
+                            Identifier id = Identifier.tryParse(target.substring(1));
+                            if (id == null) continue;
+                            TagKey<Block> tag = TagKey.of(RegistryKeys.BLOCK, id);
                             isTarget = state.isIn(tag);
                         } else {
                             isTarget = Registries.BLOCK.getId(state.getBlock()).toString().equals(target);
@@ -69,7 +70,9 @@ public class QuestEventHandler {
                         String target = quest.target();
 
                         if (target.startsWith("#")) {
-                            TagKey<EntityType<?>> tag = TagKey.of(RegistryKeys.ENTITY_TYPE, Identifier.of(target.substring(1)));
+                            Identifier id = Identifier.tryParse(target.substring(1));
+                            if (id == null) continue;
+                            TagKey<EntityType<?>> tag = TagKey.of(RegistryKeys.ENTITY_TYPE, id);
                             isTarget = killedEntity.getType().isIn(tag);
                         } else {
                             isTarget = Registries.ENTITY_TYPE.getId(killedEntity.getType()).toString().equals(target);
@@ -89,7 +92,7 @@ public class QuestEventHandler {
                 net.minecraft.block.entity.BlockEntity be = world.getBlockEntity(hitResult.getBlockPos());
                 if (be instanceof LootableContainerBlockEntity lootable) {
                     var lootKey = lootable.getLootTable();
-                    computeOpenedChest(lootKey, player, be, false);
+                    computeOpenedChest(lootKey, player, be);
                 }
             }
             return ActionResult.PASS;
@@ -100,7 +103,7 @@ public class QuestEventHandler {
             if (!world.isClient() && hand == Hand.MAIN_HAND && hitResult != null) {
                 if (entity instanceof net.minecraft.entity.vehicle.VehicleInventory vehicle) {
                     var lootKey = vehicle.getLootTable();
-                    computeOpenedChest(lootKey, player, entity, true);
+                    computeOpenedChest(lootKey, player, entity);
                 }
             }
             return ActionResult.PASS;
@@ -189,13 +192,13 @@ public class QuestEventHandler {
         });
     }
 
-    private static void computeOpenedChest(RegistryKey<LootTable> lootKey, PlayerEntity player, Object entity, boolean isEntity) {
+    private static void computeOpenedChest(RegistryKey<LootTable> lootKey, PlayerEntity player, Object entity) {
         if (lootKey != null) {
             Identifier lootTableId = lootKey.getValue();
             for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
                 if (quest.taskType() == TaskType.OPEN_LOOT_CHEST) {
                     String target = quest.target();
-                    if (checkLootrStatus((ServerPlayerEntity) player, entity, isEntity) && (target.equals("#pacpackquests:loot_chest") || target.equals(lootTableId.toString()))) {
+                    if (checkLootrStatus((ServerPlayerEntity) player, entity) && (target.equals("#pacpackquests:loot_chest") || target.equals(lootTableId.toString()))) {
                         QuestProgressHandler.incrementProgress((ServerPlayerEntity) player, quest, 1);
                     }
                 }
@@ -203,14 +206,14 @@ public class QuestEventHandler {
         }
     }
 
-    private static boolean checkLootrStatus(ServerPlayerEntity player, Object target, boolean isEntity) {
-        if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("lootr")) {
+    private static boolean checkLootrStatus(ServerPlayerEntity player, Object target) {
+        if (!FabricLoader.getInstance().isModLoaded("lootr")) {
             return true;
         }
         try {
             Class<?> infoClass = Class.forName("noobanidus.mods.lootr.common.api.data.ILootrInfoProvider");
             if (infoClass.isInstance(target)) {
-                java.lang.reflect.Method hasOpened = infoClass.getMethod("hasOpened", UUID.class);
+                Method hasOpened = infoClass.getMethod("hasOpened", UUID.class);
                 boolean opened = (boolean) hasOpened.invoke(target, player.getUuid());
                 return !opened;
             }

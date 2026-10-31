@@ -111,7 +111,8 @@ public class ScrollbarWidget {
     private void updateScrollFromMouse(double mouseY) {
         int thumbHeight = getThumbHeight();
         double adjustedY = mouseY - y - (thumbHeight / 2.0);
-        double ratio = adjustedY / (height - thumbHeight);
+        int trackSpace = height - thumbHeight;
+        double ratio = trackSpace > 0 ? adjustedY / trackSpace : 0.0;
         ratio = MathHelper.clamp(ratio, 0.0, 1.0);
         this.scrollAmount = ratio * maxScroll;
         if (!smoothScrolling) {
