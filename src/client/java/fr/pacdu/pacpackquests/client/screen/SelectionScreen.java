@@ -243,8 +243,6 @@ public class SelectionScreen extends Screen {
 
     private void addEntry(String idStr, boolean atFirst) {
         if (idStr == null || idStr.isEmpty()) return;
-        var world = client.world;
-        RegistryWrapper.WrapperLookup registries = world != null ? world.getRegistryManager() : DynamicRegistryManager.EMPTY;
 
         boolean isTag = idStr.startsWith("#");
         String raw = isTag ? idStr.substring(1) : idStr;
