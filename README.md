@@ -1,6 +1,6 @@
 ﻿# PacPack Quests
 
-PacPack Quests is a modern, lightweight questing mod for Fabric 1.21.11. It features a fully integrated in-game visual editor, allowing modpack creators and server admins to build, edit, and organize drag-and-drop quest trees directly in the game.
+PacPack Quests is a modern, lightweight questing mod for Fabric 1.21.11. It features a fully integrated in-game visual editor, allowing modpack creators and server admins to build, edit, and organize drag-and-drop quest trees directly in the game, you can open the menu by pressing the `O` key (default).
 
 ![Main Interface Preview](https://cdn.modrinth.com/data/cached_images/3c2b6a751e8d82c589926a8d913cb994a2055a70.jpeg)
 
@@ -25,6 +25,7 @@ I am actively working on expanding the mod's capabilities! Here is a glimpse of 
 * **Graphical Overhaul:** Enhancing the visual appeal of the quest menus and nodes for a more polished experience.
 * **New Quest Types:** Adding even more ways to track player progression and actions.
 * **New Reward Types:** Introducing more versatile rewards, notably the ability for admins to create a custom list of choices, offering players a random reward from that list upon completion.
+* **Teams:** Adding a team system with shared quest progress.
 
 Have an idea for a new feature, a new type of quest, or a cool reward mechanic? Let me know!
 
@@ -47,7 +48,7 @@ The mod is very easy to use, but here are some explanations to help you get the 
 
 This screen is the main screen, at the start you will have only one category with an empty grid giving you free rein to design your own quest trees.
 
-* **The Edit Mode:** In the top right corner, you will have an "Edit" button (only visible to admins) letting you switch between the **Normal Mode** (for all players) and the **Edit Mode** (for admins).
+* **The Edit Mode:** In the top right corner, you will have an "Edit" button (only visible to admins) letting you switch between the **`Normal Mode`** (for all players) and the **`Edit Mode`** (for admins).
 
 ### Normal Mode, Player View
 
@@ -77,7 +78,7 @@ This screen lets you edit every quest option or delete the quest.
     * **Obtain Item:** requires the player to have the target item in their inventory.
     * **Open a Loot Chest:** requires the player to open a loot chest, such as those found in generated structures.
 * **Task Target:** The target of the task.
-* **Required Amount:** The required amount to reach in order for the user to complete the quest. Unavailable for biomes and dimensions. Maximum of 9,999,999 for all tasks except Obtain Item that is limited to 2,304 because it's the maximum amount of items in a player's inventory (4 * 9 * 64).
+* **Required Amount:** The required amount to reach in order for the user to complete the quest. Unavailable for biomes and dimensions. Maximum of 9,999,999 for all tasks except `Obtain Item` that is limited to 2,304 because it's the maximum amount of items in a player's inventory (4 x 9 x 64).
 * **Unique ID:** The quest ID, used to name the associated JSON file and identify the quest among the others by the mod. Defaults to a formatted version of the title. Must be unique, if the default given ID isn't unique, you'll be prompted to manually edit it with what you want.
 * **Parent Quests:** Prerequisite quests that the player must complete before unlocking this one.
 * **Reward:** The type of the reward given to the player when they complete the quest:
@@ -94,11 +95,15 @@ This screen lets you edit every quest option or delete the quest.
 
 This screen lets you choose an element among a list of entries.
 * **The Search Field:** On top you'll find a search field, similar to JEI's,
-    * By starting a search with @, it will search only in the mod name of the elements, for example "@draconic" will show you only the elements of the mod Draconic Evolution.
-    * By starting the search with a #, it will search only in the tag names.
+    * By starting a search with `@`, it will search only in the mod name of the elements, for example `@draconic` will show you only the elements of the mod Draconic Evolution.
+    * By starting the search with a `#`, it will search only in the tag names.
     * By typing a normal search, it will search in the element names and additional info, for example, searching "speed" will show you, among others, the swiftness and slowness arrows because they have the speed percentage effect in their additional info.
 * **The grid:** A grid of all the possible elements. Hovering over an element will show you its name, mod name and additional info. Clicking on an element will select it and close the screen.
 
 ### IV - Parent Selection Screen
 
-This screen lets you select all parent quests. It features the same grid and navigation controls as the Quest Menu. Toggle parents by clicking on quests, then click the "Done" button to confirm your selection.
+This screen lets you select all parent quests. It features the same grid and navigation controls as the Quest Menu. Toggle parents by clicking on quests, then click the `Done` button to confirm your selection.
+
+### V - Command Edit Screen
+
+This screen lets you write a Minecraft command like in a command block. The command will be executed [Reward Amount] times when the player will claim the quest reward. The command description accept translation keys.
