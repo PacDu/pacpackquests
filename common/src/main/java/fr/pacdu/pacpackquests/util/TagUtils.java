@@ -1,14 +1,14 @@
 package fr.pacdu.pacpackquests.util;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.EntityType;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.tag.TagKey;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,21 +22,15 @@ public class TagUtils {
      * @return the first Item in the tag list.
      */
     public static Item getFirstItemInTag(Identifier tagId) {
-        // 1. Create a TagKey specifically for the ITEM registry
-        TagKey<Item> tagKey = TagKey.of(RegistryKeys.ITEM, tagId);
+        TagKey<Item> tagKey = TagKey.create(Registries.ITEM, tagId);
+        var entryList = BuiltInRegistries.ITEM.get(tagKey);
 
-        // 2. Fetch the list of entries (items) linked to this tag using the new 1.21.2+ method
-        var entryList = Registries.ITEM.getOptional(tagKey);
-
-        // 3. If the tag exists, return the first one found
         if (entryList.isPresent()) {
             for (var entry : entryList.get()) {
-                return entry.value(); // Returns the very first item and stops the loop
+                return entry.value();
             }
         }
 
-        // 4. Safe fallback if the tag is empty or doesn't exist
-        // (prevents UI crashes if a mod is removed)
         return Items.BARRIER;
     }
 
@@ -47,12 +41,12 @@ public class TagUtils {
      * @return the first Block in the tag list.
      */
     public static Block getFirstBlockInTag(Identifier tagId) {
-        TagKey<Block> tagKey = TagKey.of(RegistryKeys.BLOCK, tagId);
-        var entryList = Registries.BLOCK.getOptional(tagKey);
+        TagKey<Block> tagKey = TagKey.create(Registries.BLOCK, tagId);
+        var entryList = BuiltInRegistries.BLOCK.get(tagKey);
 
         if (entryList.isPresent()) {
             for (var entry : entryList.get()) {
-                return entry.value(); // Returns the very first item and stops the loop
+                return entry.value();
             }
         }
 
@@ -66,8 +60,8 @@ public class TagUtils {
      * @return the first Entity in the tag list.
      */
     public static EntityType<?> getFirstEntityTypeInTag(Identifier tagId) {
-        TagKey<EntityType<?>> tagKey = TagKey.of(RegistryKeys.ENTITY_TYPE, tagId);
-        var entryList = Registries.ENTITY_TYPE.getOptional(tagKey);
+        TagKey<EntityType<?>> tagKey = TagKey.create(Registries.ENTITY_TYPE, tagId);
+        var entryList = BuiltInRegistries.ENTITY_TYPE.get(tagKey);
 
         if (entryList.isPresent()) {
             for (var entry : entryList.get()) {
@@ -85,11 +79,10 @@ public class TagUtils {
      * @return a List of all the items in the tag.
      */
     public static List<Item> getAllItemsInTag(Identifier tagId) {
-        TagKey<Item> tagKey = TagKey.of(RegistryKeys.ITEM, tagId);
+        TagKey<Item> tagKey = TagKey.create(Registries.ITEM, tagId);
         List<Item> items = new ArrayList<>();
 
-        Registries.ITEM.getOptional(tagKey).ifPresent(entries -> {
-            // Extract the actual Item object from each RegistryEntry
+        BuiltInRegistries.ITEM.get(tagKey).ifPresent(entries -> {
             entries.forEach(entry -> items.add(entry.value()));
         });
 

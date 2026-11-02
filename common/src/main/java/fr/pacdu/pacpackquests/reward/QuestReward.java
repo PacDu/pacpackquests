@@ -1,30 +1,26 @@
 package fr.pacdu.pacpackquests.reward;
 
 import fr.pacdu.pacpackquests.RewardType;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 
-/**
- * Sealed interface representing a reward that can be granted to a player upon quest completion.
- * Specific reward types (Item, XP, Level, Command) encapsulate their own data and execution logic.
- */
 public sealed interface QuestReward permits ItemReward, XpReward, LevelReward, CommandReward {
 
     RewardType type();
 
     int amount();
 
-    void grant(ServerPlayerEntity player, DynamicRegistryManager registryManager);
+    void grant(ServerPlayer player, RegistryAccess registryManager);
 
-    ItemStack createIconStack(RegistryWrapper.WrapperLookup registries);
+    ItemStack createIconStack(HolderLookup.Provider registries);
 
-    void write(PacketByteBuf buf);
+    void write(FriendlyByteBuf buf);
 
-    static QuestReward read(PacketByteBuf buf) {
-        RewardType type = buf.readEnumConstant(RewardType.class);
+    static QuestReward read(FriendlyByteBuf buf) {
+        RewardType type = buf.readEnum(RewardType.class);
         return switch (type) {
             case ITEM -> ItemReward.read(buf);
             case XP -> XpReward.read(buf);

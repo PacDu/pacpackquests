@@ -1,7 +1,7 @@
 package fr.pacdu.pacpackquests;
 
 import fr.pacdu.pacpackquests.reward.*;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +32,18 @@ public record QuestDefinition(
         if (rewards == null) rewards = List.of(new ItemReward("minecraft:diamond", 1));
     }
 
+    public QuestDefinition withPosition(int newX, int newY) {
+        return new QuestDefinition(id, title, category, icon, newX, newY, parents, properties, tasks, rewards);
+    }
+
+    public QuestDefinition withIdAndTitle(String newId, String newTitle) {
+        return new QuestDefinition(newId, newTitle, category, icon, displayX, displayY, parents, properties, tasks, rewards);
+    }
+
+    public QuestDefinition withCategory(String newCategory) {
+        return new QuestDefinition(id, title, newCategory, icon, displayX, displayY, parents, properties, tasks, rewards);
+    }
+
     public static QuestReward createReward(RewardType type, String target, int amount, String description) {
         if (type == null) return new ItemReward("minecraft:diamond", 1);
         return switch (type) {
@@ -49,7 +61,7 @@ public record QuestDefinition(
     }
 
     public QuestReward primaryReward() {
-        return (rewards != null && !rewards.isEmpty()) ? rewards.getFirst() : new ItemReward("minecraft:stone", 1);
+        return (rewards != null && !rewards.isEmpty()) ? rewards.getFirst() : new ItemReward("minecraft:diamond", 1);
     }
 
     public TaskType taskType() {
@@ -69,37 +81,26 @@ public record QuestDefinition(
     }
 
     public String reward() {
-        return switch (primaryReward()) {
-            case ItemReward item -> item.target();
-            case CommandReward cmd -> cmd.command();
-            case XpReward xp -> "xp";
-            case LevelReward lvl -> "level";
-        };
+        if (primaryReward() instanceof ItemReward ir) {
+            return ir.target();
+        } else if (primaryReward() instanceof CommandReward cr) {
+            return cr.command();
+        }
+        return "";
     }
 
     public int rewardAmount() {
         return primaryReward().amount();
     }
 
-    public String commandDescription() {
-        return primaryReward() instanceof CommandReward cmd && cmd.description() != null && !cmd.description().isBlank() ? cmd.description() : "";
+    public String rewardDescription() {
+        if (primaryReward() instanceof CommandReward cr) {
+            return cr.description();
+        }
+        return "";
     }
 
-    // --- Withers ---
-
-    public QuestDefinition withPosition(int x, int y) {
-        return new QuestDefinition(id, title, category, icon, x, y, parents, properties, tasks, rewards);
-    }
-
-    public QuestDefinition withCategory(String newCategory) {
-        return new QuestDefinition(id, title, newCategory, icon, displayX, displayY, parents, properties, tasks, rewards);
-    }
-
-    public QuestDefinition withIdAndTitle(String newId, String newTitle) {
-        return new QuestDefinition(newId, newTitle, category, icon, displayX, displayY, parents, properties, tasks, rewards);
-    }
-
-    public QuestDefinition withParents(List<String> newParents) {
-        return new QuestDefinition(id, title, category, icon, displayX, displayY, newParents, properties, tasks, rewards);
+    public String description() {
+        return properties != null ? properties.getOrDefault("description", "") : "";
     }
 }

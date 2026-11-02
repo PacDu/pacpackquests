@@ -1,118 +1,38 @@
 package fr.pacdu.pacpackquests.client;
 
-import fr.pacdu.pacpackquests.QuestDefinition;
-import fr.pacdu.pacpackquests.client.config.ClientConfig;
-import fr.pacdu.pacpackquests.client.screen.QuestScreen;
-import fr.pacdu.pacpackquests.client.screen.SelectionScreen;
 import fr.pacdu.pacpackquests.network.*;
-import fr.pacdu.pacpackquests.util.RegistryType;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-
-import java.util.List;
 
 public class ClientNetworkHandler {
 
     private ClientNetworkHandler() {}
 
     public static void register() {
-        ClientPlayNetworking.registerGlobalReceiver(QuestSyncPayload.ID, (payload, context) -> context.client().execute(() -> {
-            var client = context.client();
-            var registries = client.world != null ? client.world.getRegistryManager() : (client.getServer() != null ? client.getServer().getRegistryManager() : null);
-            QuestDefinition def = payload.toDefinition(registries);
-            PacPackQuestsClient.CLIENT_DEFINITIONS.put(payload.questId(), def);
-            if (!PacPackQuestsClient.CLIENT_CATEGORIES.contains(def.category())) {
-                PacPackQuestsClient.CLIENT_CATEGORIES.add(def.category());
-            }
+        ClientPlayNetworking.registerGlobalReceiver(QuestSyncPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> ClientQuestData.handleQuestSync(payload)));
 
-            if (context.client().currentScreen instanceof QuestScreen qs) qs.refreshUI();
-        }));
+        ClientPlayNetworking.registerGlobalReceiver(QuestProgressPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> ClientQuestData.handleQuestProgress(payload)));
 
-        ClientPlayNetworking.registerGlobalReceiver(QuestProgressPayload.ID, (payload, context) -> context.client().execute(() -> {
-            PacPackQuestsClient.CLIENT_PROGRESS.put(payload.questId(), payload.progress());
-            PacPackQuestsClient.CLIENT_FINISHED.put(payload.questId(), payload.isFinished());
-            PacPackQuestsClient.CLIENT_CLAIMED.put(payload.questId(), payload.isClaimed());
+        ClientPlayNetworking.registerGlobalReceiver(DeleteQuestPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> ClientQuestData.handleDeleteQuest(payload)));
 
-            if (context.client().currentScreen instanceof QuestScreen questScreen) {
-                questScreen.updateClaimButtonState();
-            }
-        }));
+        ClientPlayNetworking.registerGlobalReceiver(CreateCategoryPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> ClientQuestData.handleCreateCategory(payload)));
 
-        ClientPlayNetworking.registerGlobalReceiver(DeleteQuestPayload.ID, (payload, context) -> context.client().execute(() -> {
-            PacPackQuestsClient.CLIENT_DEFINITIONS.remove(payload.questId());
-            PacPackQuestsClient.CLIENT_PROGRESS.remove(payload.questId());
-            PacPackQuestsClient.CLIENT_FINISHED.remove(payload.questId());
-            PacPackQuestsClient.CLIENT_CLAIMED.remove(payload.questId());
+        ClientPlayNetworking.registerGlobalReceiver(DeleteCategoryPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> ClientQuestData.handleDeleteCategory(payload)));
 
-            if (context.client().currentScreen instanceof QuestScreen questScreen) {
-                questScreen.refreshUI();
-            }
-        }));
+        ClientPlayNetworking.registerGlobalReceiver(ReorderCategoryPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> ClientQuestData.handleReorderCategory(payload)));
 
-        ClientPlayNetworking.registerGlobalReceiver(CreateCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
-            if (!PacPackQuestsClient.CLIENT_CATEGORIES.contains(payload.category())) {
-                PacPackQuestsClient.CLIENT_CATEGORIES.add(payload.category());
-            }
-        }));
+        ClientPlayNetworking.registerGlobalReceiver(EditCategoryPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> ClientQuestData.handleEditCategory(payload)));
 
-        ClientPlayNetworking.registerGlobalReceiver(DeleteCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
-            PacPackQuestsClient.CLIENT_DEFINITIONS.entrySet().removeIf(entry -> entry.getValue().category().equals(payload.category()));
-            PacPackQuestsClient.CLIENT_CATEGORIES.remove(payload.category());
-            ClientConfig.cameraPositions.remove(payload.category());
+        ClientPlayNetworking.registerGlobalReceiver(SyncRegistryPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> ClientQuestData.handleSyncRegistry(payload)));
 
-            if (context.client().currentScreen instanceof QuestScreen questScreen) {
-                questScreen.removeCategory(payload.category());
-            }
-        }));
-
-        ClientPlayNetworking.registerGlobalReceiver(ReorderCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
-            PacPackQuestsClient.CLIENT_CATEGORIES.clear();
-            PacPackQuestsClient.CLIENT_CATEGORIES.addAll(payload.categories());
-            if (context.client().currentScreen instanceof QuestScreen questScreen) {
-                questScreen.refreshUI();
-            }
-        }));
-
-        ClientPlayNetworking.registerGlobalReceiver(EditCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
-            for (QuestDefinition quest : PacPackQuestsClient.CLIENT_DEFINITIONS.values()) {
-                if (quest.category().equals(payload.categoryOld())) {
-                    QuestDefinition updatedQuest = quest.withCategory(payload.categoryNew());
-                    PacPackQuestsClient.CLIENT_DEFINITIONS.put(quest.id(), updatedQuest);
-                }
-            }
-
-            ClientConfig.CameraState state = ClientConfig.cameraPositions.remove(payload.categoryOld());
-            if (state != null) {
-                ClientConfig.cameraPositions.put(payload.categoryNew(), state);
-            }
-
-            if (context.client().currentScreen instanceof QuestScreen questScreen) {
-                questScreen.renameCategory(payload.categoryOld(), payload.categoryNew());
-            }
-        }));
-
-        ClientPlayNetworking.registerGlobalReceiver(SyncRegistryPayload.ID, (payload, context) -> context.client().execute(() -> {
-            if (payload.type() == RegistryType.STRUCTURE) {
-                PacPackQuestsClient.SERVER_STRUCTURES.clear();
-                PacPackQuestsClient.SERVER_STRUCTURES.addAll(payload.entries());
-                if (context.client().currentScreen instanceof SelectionScreen screen && screen.getRegistryType() == RegistryType.STRUCTURE) {
-                    screen.refreshEntries(PacPackQuestsClient.SERVER_STRUCTURES);
-                }
-            } else if (payload.type() == RegistryType.LOOT_TABLE) {
-                PacPackQuestsClient.SERVER_LOOT_TABLES.clear();
-                PacPackQuestsClient.SERVER_LOOT_TABLES.addAll(payload.entries());
-                if (context.client().currentScreen instanceof SelectionScreen screen && screen.getRegistryType() == RegistryType.LOOT_TABLE) {
-                    screen.refreshEntries(PacPackQuestsClient.SERVER_LOOT_TABLES);
-                }
-            }
-        }));
-
-        ClientPlayNetworking.registerGlobalReceiver(QuestCompletedPayload.ID, (payload, context) -> {
-            context.client().execute(() -> {
-                QuestDefinition quest = PacPackQuestsClient.CLIENT_DEFINITIONS.get(payload.questId());
-                if (quest != null) {
-                    context.client().getToastManager().add(new QuestCompletedToast(quest));
-                }
-            });
-        });
+        ClientPlayNetworking.registerGlobalReceiver(QuestCompletedPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> ClientQuestData.handleQuestCompleted(payload)));
     }
 }

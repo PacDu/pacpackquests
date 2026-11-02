@@ -1,31 +1,33 @@
 package fr.pacdu.pacpackquests.client.screen;
 
-import fr.pacdu.pacpackquests.client.PacPackQuestsClient;
+import fr.pacdu.pacpackquests.client.ClientQuestData;
 import fr.pacdu.pacpackquests.client.gui.ScrollbarWidget;
 import fr.pacdu.pacpackquests.client.util.DrawUtils;
+import fr.pacdu.pacpackquests.client.util.IconUtils;
 import fr.pacdu.pacpackquests.client.util.TranslationUtils;
 import fr.pacdu.pacpackquests.network.RequestRegistryPayload;
-import fr.pacdu.pacpackquests.client.util.IconUtils;
+import fr.pacdu.pacpackquests.platform.Services;
 import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.RegistryType;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemGroups;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -52,7 +54,7 @@ public class SelectionScreen extends Screen {
     private final Consumer<String> onSelected;
     private final String previouslySelectedEntry;
 
-    private TextFieldWidget searchBox;
+    private EditBox searchBox;
     private final List<SelectionEntry> allEntries = new ArrayList<>();
     private final List<SelectionEntry> filteredEntries = new ArrayList<>();
 
@@ -65,7 +67,7 @@ public class SelectionScreen extends Screen {
     private boolean isReward = false;
 
     public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected, String previouslySelectedEntry) {
-        super(Text.translatable("gui.pacpackquests.select_element"));
+        super(Component.translatable("gui.pacpackquests.select_element"));
         this.parent = parent;
         this.contextType = contextType;
         this.onSelected = onSelected;
@@ -92,16 +94,16 @@ public class SelectionScreen extends Screen {
 
         // 1. Search Box
         int searchWidth = 160;
-        this.searchBox = new TextFieldWidget(this.textRenderer, (this.width - searchWidth) / 2, 20, searchWidth, 20, Text.empty());
+        this.searchBox = new EditBox(this.font, (this.width - searchWidth) / 2, 20, searchWidth, 20, Component.empty());
         this.searchBox.setMaxLength(128);
-        this.searchBox.setPlaceholder(Text.translatable("gui.pacpackquests.search").formatted(Formatting.DARK_GRAY));
-        this.searchBox.setChangedListener(this::updateSearch);
-        this.addDrawableChild(this.searchBox);
+        this.searchBox.setHint(Component.translatable("gui.pacpackquests.search").withStyle(ChatFormatting.DARK_GRAY));
+        this.searchBox.setResponder(this::updateSearch);
+        this.addRenderableWidget(this.searchBox);
         this.setFocused(this.searchBox);
 
         // 2. Cancel Button
-        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.pacpackquests.cancel"), button -> this.client.setScreen(this.parent))
-                .dimensions((this.width - 100) / 2, this.height - 30, 100, 20).build());
+        this.addRenderableWidget(Button.builder(Component.translatable("gui.pacpackquests.cancel"), button -> this.minecraft.setScreen(this.parent))
+                .bounds((this.width - 100) / 2, this.height - 30, 100, 20).build());
 
         // 3. Populate initial data based on context
         this.populateEntries();
@@ -113,23 +115,23 @@ public class SelectionScreen extends Screen {
      */
     private void populateEntries() {
         allEntries.clear();
-        var world = client.world;
-        RegistryWrapper.WrapperLookup registries = world != null ? world.getRegistryManager() : DynamicRegistryManager.EMPTY;
+        var world = this.minecraft.level;
+        HolderLookup.Provider registries = world != null ? world.registryAccess() : RegistryAccess.EMPTY;
         boolean addPreviousEntry = true;
 
         switch (contextType) {
             case ITEM -> {
                 // 1. Ensure creative search tab stacks are initialized
-                Collection<ItemStack> searchStacks = ItemGroups.getSearchGroup().getSearchTabStacks();
+                Collection<ItemStack> searchStacks = CreativeModeTabs.searchTab().getSearchTabDisplayItems();
                 if (searchStacks.isEmpty() && world != null) {
-                    var enabledFeatures = world.getEnabledFeatures();
-                    boolean operator = client.player != null && client.player.isCreativeLevelTwoOp();
-                    ItemGroups.updateDisplayContext(enabledFeatures, operator, registries);
-                    searchStacks = ItemGroups.getSearchGroup().getSearchTabStacks();
+                    var enabledFeatures = world.enabledFeatures();
+                    boolean operator = this.minecraft.player != null && this.minecraft.player.canUseGameMasterBlocks();
+                    CreativeModeTabs.tryRebuildTabContents(enabledFeatures, operator, registries);
+                    searchStacks = CreativeModeTabs.searchTab().getSearchTabDisplayItems();
                 }
 
                 if (searchStacks.isEmpty()) {
-                    searchStacks = Registries.ITEM.stream().map(Item::getDefaultStack).toList();
+                    searchStacks = BuiltInRegistries.ITEM.stream().map(Item::getDefaultInstance).toList();
                 }
 
                 // 2. Populate stacks in creative tab order
@@ -140,17 +142,17 @@ public class SelectionScreen extends Screen {
 
                 // 3. Add tags last if enabled
                 if (this.withTags) {
-                    Registries.ITEM.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> {
-                        Identifier tagId = key.id();
+                    BuiltInRegistries.ITEM.getTags().forEach(tag -> {
+                        Identifier tagId = tag.key().location();
                         String tagString = "#" + tagId;
                         addEntry(tagString);
-                    }));
+                    });
                 }
             }
             case BLOCK -> {
-                Registries.BLOCK.getIds().forEach(id -> addEntry(id.toString()));
+                BuiltInRegistries.BLOCK.keySet().forEach(id -> addEntry(id.toString()));
                 if (this.withTags) {
-                    Registries.BLOCK.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> addEntry("#" + key.id().toString())));
+                    BuiltInRegistries.BLOCK.getTags().forEach(tag -> addEntry("#" + tag.key().location().toString()));
                 }
                 this.allEntries.sort(this::compareEntries);
             }
@@ -158,65 +160,71 @@ public class SelectionScreen extends Screen {
                 java.util.Set<Identifier> validMobs = new java.util.HashSet<>();
 
                 // Filter the raw entity IDs to keep only real mobs
-                Registries.ENTITY_TYPE.getIds().forEach(id -> {
-                    var type = Registries.ENTITY_TYPE.get(id);
-                    var group = type.getSpawnGroup();
+                BuiltInRegistries.ENTITY_TYPE.keySet().forEach(id -> {
+                    var type = BuiltInRegistries.ENTITY_TYPE.getValue(id);
+                    var group = type.getCategory();
 
                     // Check if a spawn egg exists for this entity (covers MISC mobs like Wither, Villagers, Golems)
-                    Identifier eggId = Identifier.of(id.getNamespace(), id.getPath() + "_spawn_egg");
-                    boolean hasSpawnEgg = Registries.ITEM.containsId(eggId);
+                    Identifier eggId = Identifier.fromNamespaceAndPath(id.getNamespace(), id.getPath() + "_spawn_egg");
+                    boolean hasSpawnEgg = BuiltInRegistries.ITEM.containsKey(eggId);
 
                     // A valid mob is either in a natural spawn group, has a spawn egg, or is the player explicitly
-                    if (group != net.minecraft.entity.SpawnGroup.MISC || hasSpawnEgg || id.getPath().equals("player")) {
+                    if (group != MobCategory.MISC || hasSpawnEgg || id.getPath().equals("player")) {
                         validMobs.add(id);
                         addEntry(id.toString());
                     }
                 });
 
                 // Add tag only if at least ONE of its entities is a valid mob
-                Registries.ENTITY_TYPE.streamTags().forEach(tagList -> {
-                    boolean hasValidMob = tagList.stream().anyMatch(entry -> validMobs.contains(Registries.ENTITY_TYPE.getId(entry.value())));
+                BuiltInRegistries.ENTITY_TYPE.getTags().forEach(tagList -> {
+                    boolean hasValidMob = tagList.stream().anyMatch(entry -> validMobs.contains(BuiltInRegistries.ENTITY_TYPE.getKey(entry.value())));
                     if (hasValidMob) {
-                        tagList.getTagKey().ifPresent(key -> addEntry("#" + key.id().toString()));
+                        addEntry("#" + tagList.key().location().toString());
                     }
                 });
                 this.allEntries.sort(this::compareEntries);
             }
             case BIOME -> {
                 if (world != null) {
-                    var registry = world.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
-                    registry.getIds().forEach(id -> addEntry(id.toString()));
-                    registry.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> addEntry("#" + key.id().toString())));
-                    this.allEntries.sort(this::compareEntries);
+                    var registryOpt = world.registryAccess().lookup(Registries.BIOME);
+                    if (registryOpt.isPresent()) {
+                        var registry = registryOpt.get();
+                        registry.listElementIds().forEach(id -> addEntry(id.identifier().toString()));
+                        registry.listTags().forEach(tag -> addEntry("#" + tag.key().location().toString()));
+                        this.allEntries.sort(this::compareEntries);
+                    }
                 }
             }
             case STRUCTURE -> {
-                var server = MinecraftClient.getInstance().getServer();
+                var server = Minecraft.getInstance().getSingleplayerServer();
                 if (server != null) {
-                    var registry = server.getRegistryManager().getOrThrow(RegistryKeys.STRUCTURE);
-                    registry.getIds().forEach(id -> addEntry(id.toString()));
-                    registry.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> addEntry("#" + key.id().toString())));
-                    this.allEntries.sort(this::compareEntries);
+                    var registryOpt = server.registryAccess().lookup(Registries.STRUCTURE);
+                    if (registryOpt.isPresent()) {
+                        var registry = registryOpt.get();
+                        registry.listElementIds().forEach(id -> addEntry(id.identifier().toString()));
+                        registry.listTags().forEach(tag -> addEntry("#" + tag.key().location().toString()));
+                        this.allEntries.sort(this::compareEntries);
+                    }
                 } else {
                     addPreviousEntry = false;
-                    refreshEntries(PacPackQuestsClient.SERVER_STRUCTURES);
-                    ClientPlayNetworking.send(new RequestRegistryPayload(RegistryType.STRUCTURE));
+                    refreshEntries(ClientQuestData.SERVER_STRUCTURES);
+                    Services.NETWORK.sendToServer(new RequestRegistryPayload(RegistryType.STRUCTURE));
                 }
             }
             case DIMENSION -> {
-                var handler = MinecraftClient.getInstance().getNetworkHandler();
+                var handler = Minecraft.getInstance().getConnection();
                 if (handler != null) {
-                    handler.getWorldKeys().forEach(key -> addEntry(key.getValue().toString()));
+                    handler.levels().forEach(key -> addEntry(key.identifier().toString()));
                     this.allEntries.sort(this::compareEntries);
                 }
             }
             case LOOT_TABLE -> {
                 addEntry("#pacpackquests:loot_chest");
-                var server = MinecraftClient.getInstance().getServer();
+                var server = Minecraft.getInstance().getSingleplayerServer();
                 if (server != null) {
-                    var opt = server.getReloadableRegistries().createRegistryLookup().getOptional(RegistryKeys.LOOT_TABLE);
-                    opt.ifPresent(lootTableImpl -> lootTableImpl.streamKeys().forEach(key -> {
-                        Identifier id = key.getValue();
+                    var opt = server.reloadableRegistries().lookup().lookup(Registries.LOOT_TABLE);
+                    opt.ifPresent(lootTableImpl -> lootTableImpl.listElementIds().forEach(key -> {
+                        Identifier id = key.identifier();
                         if (id.getPath().startsWith("chests/")) {
                             addEntry(id.toString());
                         }
@@ -224,8 +232,8 @@ public class SelectionScreen extends Screen {
                     this.allEntries.sort(this::compareEntries);
                 } else {
                     addPreviousEntry = false;
-                    refreshEntries(PacPackQuestsClient.SERVER_LOOT_TABLES);
-                    ClientPlayNetworking.send(new RequestRegistryPayload(RegistryType.LOOT_TABLE));
+                    refreshEntries(ClientQuestData.SERVER_LOOT_TABLES);
+                    Services.NETWORK.sendToServer(new RequestRegistryPayload(RegistryType.LOOT_TABLE));
                 }
             }
             case COMMAND -> {}
@@ -274,8 +282,8 @@ public class SelectionScreen extends Screen {
     private String getTooltipText(ItemStack stack) {
         StringBuilder tooltipText = new StringBuilder();
         try {
-            List<Text> tooltipLines = Screen.getTooltipFromItem(client, stack);
-            for (Text line : tooltipLines) {
+            List<Component> tooltipLines = Screen.getTooltipFromItem(this.minecraft, stack);
+            for (Component line : tooltipLines) {
                 tooltipText.append(line.getString().toLowerCase(Locale.ROOT)).append(" ");
             }
         } catch (Exception ignored) {}
@@ -297,7 +305,7 @@ public class SelectionScreen extends Screen {
         this.allEntries.sort(this::compareEntries);
         removeEntry(this.previouslySelectedEntry);
         addEntry(this.previouslySelectedEntry, true);
-        this.updateSearch(this.searchBox != null ? this.searchBox.getText() : "");
+        this.updateSearch(this.searchBox != null ? this.searchBox.getValue() : "");
     }
 
     /**
@@ -345,10 +353,10 @@ public class SelectionScreen extends Screen {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
 
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 5, 0xFFFFFFFF);
+        context.drawCenteredString(this.font, this.title, this.width / 2, 5, 0xFFFFFFFF);
 
         int startX = (this.width - (columns * 18)) / 2;
         int startY = 50;
@@ -367,11 +375,11 @@ public class SelectionScreen extends Screen {
             int cellY = startY + (row * 18);
 
             // Draw Item Icon
-            context.drawItem(entry.stack, cellX + 1, cellY + 1);
+            context.renderItem(entry.stack, cellX + 1, cellY + 1);
 
             // If it's a tag, draw a small yellow '#' overlay
             if (entry.isTag) {
-                context.drawText(this.textRenderer, "#", cellX + 2, cellY + 2, 0xFFFFFF00, true);
+                context.drawString(this.font, "#", cellX + 2, cellY + 2, 0xFFFFFF00, true);
             }
 
             if (this.previouslySelectedEntry.equals(entry.id)) {
@@ -387,30 +395,30 @@ public class SelectionScreen extends Screen {
 
         // Draw JEI-styled Tooltip on top of everything
         if (hoveredEntry != null) {
-            List<Text> tooltip = new ArrayList<>();
+            List<Component> tooltip = new ArrayList<>();
 
             if (hoveredEntry.isTag) {
                 Identifier tagId = Identifier.tryParse(hoveredEntry.id.substring(1));
                 int count = TranslationUtils.getTagSize(tagId, this.contextType);
                 String countStr = count >= 0 ? Integer.toString(count) : "?";
 
-                tooltip.add(Text.literal(hoveredEntry.displayName).formatted(Formatting.GOLD));
-                tooltip.add(Text.translatable("gui.pacpackquests.tag")
-                        .append(Text.literal(" (" + countStr + " "))
-                        .append(Text.translatable("registry.pacpackquests." + contextType.name().toLowerCase(Locale.ROOT)))
-                        .append(Text.literal(")"))
-                        .formatted(Formatting.GRAY));
+                tooltip.add(Component.literal(hoveredEntry.displayName).withStyle(ChatFormatting.GOLD));
+                tooltip.add(Component.translatable("gui.pacpackquests.tag")
+                        .append(Component.literal(" (" + countStr + " "))
+                        .append(Component.translatable("registry.pacpackquests." + contextType.name().toLowerCase(Locale.ROOT)))
+                        .append(Component.literal(")"))
+                        .withStyle(ChatFormatting.GRAY));
             } else if (!hoveredEntry.stack.isEmpty() && contextType == RegistryType.ITEM) {
                 // Vanilla item tooltip (handles item name color, enchantments, potion effects)
-                tooltip.addAll(Screen.getTooltipFromItem(this.client, hoveredEntry.stack));
+                tooltip.addAll(Screen.getTooltipFromItem(this.minecraft, hoveredEntry.stack));
             } else {
-                tooltip.add(Text.literal(hoveredEntry.displayName).formatted(Formatting.GOLD));
+                tooltip.add(Component.literal(hoveredEntry.displayName).withStyle(ChatFormatting.GOLD));
             }
 
             // JEI mod name line in Blue Italic
-            tooltip.add(Text.literal(hoveredEntry.modName).formatted(Formatting.BLUE, Formatting.ITALIC));
+            tooltip.add(Component.literal(hoveredEntry.modName).withStyle(ChatFormatting.BLUE, ChatFormatting.ITALIC));
 
-            context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
+            context.setTooltipForNextFrame(this.font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
         }
 
         // Scrollbar Render
@@ -422,7 +430,7 @@ public class SelectionScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean doubled) {
+    public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
         if (click.button() == 0) { // Left click
             int startX = (this.width - (columns * 18)) / 2;
             int startY = 50;
@@ -444,7 +452,7 @@ public class SelectionScreen extends Screen {
                 // If user clicked this cell, trigger callback and close
                 if (click.x() >= cellX && click.x() < cellX + 18 && click.y() >= cellY && click.y() < cellY + 18) {
                     this.onSelected.accept(filteredEntries.get(dataIndex).id);
-                    this.client.setScreen(this.parent);
+                    this.minecraft.setScreen(this.parent);
                     return true;
                 }
             }
@@ -454,30 +462,30 @@ public class SelectionScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (gridScrollbar.mouseScrolled(mouseX, mouseY, verticalAmount)) return true;
+        if (gridScrollbar.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)) return true;
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     @Override
-    public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+    public boolean mouseDragged(MouseButtonEvent click, double offsetX, double offsetY) {
         if (gridScrollbar.mouseDragged(click.x(), click.y(), click.button(), offsetX, offsetY)) return true;
         return super.mouseDragged(click, offsetX, offsetY);
     }
 
     @Override
-    public boolean mouseReleased(Click click) {
+    public boolean mouseReleased(MouseButtonEvent click) {
         if (gridScrollbar.mouseReleased(click.x(), click.y(), click.button())) return true;
         return super.mouseReleased(click);
     }
 
     @Override
-    public boolean keyPressed(KeyInput input) {
-        if (input.getKeycode() == GLFW.GLFW_KEY_ESCAPE) {
-            this.client.setScreen(this.parent);
+    public boolean keyPressed(KeyEvent input) {
+        if (input.key() == GLFW.GLFW_KEY_ESCAPE) {
+            this.minecraft.setScreen(this.parent);
             return true;
-        } else if (input.getKeycode() == GLFW.GLFW_KEY_ENTER) {
-            this.onSelected.accept(this.searchBox.getText());
-            this.client.setScreen(this.parent);
+        } else if (input.key() == GLFW.GLFW_KEY_ENTER) {
+            this.onSelected.accept(this.searchBox.getValue());
+            this.minecraft.setScreen(this.parent);
             return true;
         }
         return super.keyPressed(input);
@@ -506,24 +514,32 @@ public class SelectionScreen extends Screen {
         Identifier id = Identifier.tryParse(entry);
         if (id == null) return -1;
 
-        var world = MinecraftClient.getInstance().world;
-        var server = MinecraftClient.getInstance().getServer();
+        var world = Minecraft.getInstance().level;
+        var server = Minecraft.getInstance().getSingleplayerServer();
 
         return switch (this.contextType) {
-            case ITEM -> Registries.ITEM.containsId(id) ? Registries.ITEM.getRawId(Registries.ITEM.get(id)) : -1;
-            case BLOCK -> Registries.BLOCK.containsId(id) ? Registries.BLOCK.getRawId(Registries.BLOCK.get(id)) : -1;
-            case MOB -> Registries.ENTITY_TYPE.containsId(id) ? Registries.ENTITY_TYPE.getRawId(Registries.ENTITY_TYPE.get(id)) : -1;
+            case ITEM -> BuiltInRegistries.ITEM.containsKey(id) ? BuiltInRegistries.ITEM.getId(BuiltInRegistries.ITEM.getValue(id)) : -1;
+            case BLOCK -> BuiltInRegistries.BLOCK.containsKey(id) ? BuiltInRegistries.BLOCK.getId(BuiltInRegistries.BLOCK.getValue(id)) : -1;
+            case MOB -> BuiltInRegistries.ENTITY_TYPE.containsKey(id) ? BuiltInRegistries.ENTITY_TYPE.getId(BuiltInRegistries.ENTITY_TYPE.getValue(id)) : -1;
             case BIOME -> {
                 if (world != null) {
-                    var reg = world.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
-                    yield reg.containsId(id) ? reg.getRawId(reg.get(id)) : -1;
+                    var regOpt = world.registryAccess().lookup(Registries.BIOME);
+                    if (regOpt.isPresent()) {
+                        var reg = regOpt.get();
+                        var holderOpt = reg.get(ResourceKey.create(Registries.BIOME, id));
+                        yield holderOpt.map(h -> reg.getId(h.value())).orElse(-1);
+                    }
                 }
                 yield -1;
             }
             case STRUCTURE -> {
                 if (server != null) {
-                    var reg = server.getRegistryManager().getOrThrow(RegistryKeys.STRUCTURE);
-                    yield reg.containsId(id) ? reg.getRawId(reg.get(id)) : -1;
+                    var regOpt = server.registryAccess().lookup(Registries.STRUCTURE);
+                    if (regOpt.isPresent()) {
+                        var reg = regOpt.get();
+                        var holderOpt = reg.get(ResourceKey.create(Registries.STRUCTURE, id));
+                        yield holderOpt.map(h -> reg.getId(h.value())).orElse(-1);
+                    }
                 }
                 yield -1;
             }

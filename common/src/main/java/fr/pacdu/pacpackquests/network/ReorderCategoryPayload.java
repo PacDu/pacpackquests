@@ -1,22 +1,24 @@
 package fr.pacdu.pacpackquests.network;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import fr.pacdu.pacpackquests.Constants;
+
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public record ReorderCategoryPayload(List<String> categories) implements CustomPayload {
-    public static final Id<ReorderCategoryPayload> ID = new Id<>(Identifier.of("pacpackquests", "reorder_category"));
+public record ReorderCategoryPayload(List<String> categories) implements CustomPacketPayload {
+    public static final Type<ReorderCategoryPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(Constants.MOD_ID, "reorder_category"));
 
-    public static final PacketCodec<RegistryByteBuf, ReorderCategoryPayload> CODEC = PacketCodec.tuple(
-            PacketCodecs.collection(ArrayList::new, PacketCodecs.STRING), ReorderCategoryPayload::categories,
+    public static final StreamCodec<RegistryFriendlyByteBuf, ReorderCategoryPayload> CODEC = StreamCodec.composite(
+            ByteBufCodecs.collection(ArrayList::new, ByteBufCodecs.STRING_UTF8), ReorderCategoryPayload::categories,
             ReorderCategoryPayload::new
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() { return ID; }
+    public Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

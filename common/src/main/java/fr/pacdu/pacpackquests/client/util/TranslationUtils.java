@@ -1,24 +1,24 @@
 package fr.pacdu.pacpackquests.client.util;
 
-import fr.pacdu.pacpackquests.client.PacPackQuestsClient;
+import fr.pacdu.pacpackquests.client.ClientQuestData;
+import fr.pacdu.pacpackquests.platform.Services;
 import fr.pacdu.pacpackquests.reward.*;
 import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.RegistryType;
-import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.resource.language.I18n;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntryList;
-import net.minecraft.registry.tag.TagKey;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.Identifier;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.enchantment.Enchantment;
 
 public class TranslationUtils {
 
@@ -27,35 +27,35 @@ public class TranslationUtils {
     /**
      * Formats the visual display text of a reward with appropriate styling and color.
      */
-    public static Text getRewardText(QuestReward reward, boolean isClaimed) {
-        if (reward == null) return Text.empty();
+    public static Component getRewardText(QuestReward reward, boolean isClaimed) {
+        if (reward == null) return Component.empty();
 
-        MutableText text = switch (reward) {
-            case XpReward xr -> Text.literal(xr.amount() + " XP");
-            case LevelReward lr -> Text.literal(lr.amount() + " ").append(Text.translatable("gui.pacpackquests.levels"));
-            case ItemReward ir -> Text.literal(ir.amount() + "x ").append(getTranslatedRewardName(ir.target(), RegistryType.ITEM));
+        MutableComponent text = switch (reward) {
+            case XpReward xr -> Component.literal(xr.amount() + " XP");
+            case LevelReward lr -> Component.literal(lr.amount() + " ").append(Component.translatable("gui.pacpackquests.levels"));
+            case ItemReward ir -> Component.literal(ir.amount() + "x ").append(getTranslatedRewardName(ir.target(), RegistryType.ITEM));
             case CommandReward cr -> {
                 if (cr.description() != null && !cr.description().isBlank()) {
-                    Text descText = I18n.hasTranslation(cr.description())
-                            ? Text.translatable(cr.description())
-                            : Text.literal(cr.description());
-                    yield Text.literal(cr.amount() + "x ").append(descText);
+                    Component descText = I18n.exists(cr.description())
+                            ? Component.translatable(cr.description())
+                            : Component.literal(cr.description());
+                    yield Component.literal(cr.amount() + "x ").append(descText);
                 } else {
                     String cmd = cr.command();
-                    yield Text.literal(cr.amount() + "x ").append(Text.literal((cmd.startsWith("/") ? "" : "/") + (cmd.length() > 64 ? cmd.substring(0, 64) + "..." : cmd)));
+                    yield Component.literal(cr.amount() + "x ").append(Component.literal((cmd.startsWith("/") ? "" : "/") + (cmd.length() > 64 ? cmd.substring(0, 64) + "..." : cmd)));
                 }
             }
         };
 
         if (isClaimed) {
-            return text.formatted(Formatting.DARK_GRAY, Formatting.STRIKETHROUGH);
+            return text.withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.STRIKETHROUGH);
         }
 
         return switch (reward.type()) {
-            case XP -> text.formatted(Formatting.GREEN);
-            case LEVEL -> text.formatted(Formatting.DARK_GREEN, Formatting.BOLD);
-            case ITEM -> text.formatted(Formatting.WHITE);
-            case COMMAND -> text.formatted(Formatting.YELLOW);
+            case XP -> text.withStyle(ChatFormatting.GREEN);
+            case LEVEL -> text.withStyle(ChatFormatting.DARK_GREEN, ChatFormatting.BOLD);
+            case ITEM -> text.withStyle(ChatFormatting.WHITE);
+            case COMMAND -> text.withStyle(ChatFormatting.YELLOW);
         };
     }
 
@@ -95,25 +95,25 @@ public class TranslationUtils {
         return switch (type) {
             case ITEM -> {
                 if (isComplexItem) {
-                    var world = MinecraftClient.getInstance().world;
-                    var reg = world != null ? world.getRegistryManager() : null;
+                    var world = Minecraft.getInstance().level;
+                    var reg = world != null ? world.registryAccess() : null;
                     ItemStack stack = ItemUtils.fromCommandString(entryId, reg);
                     if (!stack.isEmpty()) {
-                        if (stack.isOf(Items.ENCHANTED_BOOK)) {
-                            var stored = stack.get(DataComponentTypes.STORED_ENCHANTMENTS);
+                        if (stack.is(Items.ENCHANTED_BOOK)) {
+                            var stored = stack.get(DataComponents.STORED_ENCHANTMENTS);
                             if (stored != null && !stored.isEmpty()) {
-                                var firstEntry = stored.getEnchantmentEntries().iterator().next();
-                                Text enchText = Enchantment.getName(firstEntry.getKey(), firstEntry.getIntValue());
-                                yield stack.getName().getString() + " (" + enchText.getString() + ")";
+                                var firstEntry = stored.entrySet().iterator().next();
+                                Component enchText = Enchantment.getFullname(firstEntry.getKey(), firstEntry.getIntValue());
+                                yield stack.getHoverName().getString() + " (" + enchText.getString() + ")";
                             }
                         }
-                        yield stack.getName().getString();
+                        yield stack.getHoverName().getString();
                     }
                 }
-                yield Registries.ITEM.get(id).getName().getString();
+                yield BuiltInRegistries.ITEM.getValue(id).getName().getString();
             }
-            case BLOCK -> Registries.BLOCK.get(id).getName().getString();
-            case MOB -> Registries.ENTITY_TYPE.get(id).getName().getString();
+            case BLOCK -> BuiltInRegistries.BLOCK.getValue(id).getName().getString();
+            case MOB -> BuiltInRegistries.ENTITY_TYPE.getValue(id).getDescription().getString();
             case COMMAND -> {
                 String command = (entryId.startsWith("/") ? "" : "/") + entryId;
                 if (command.length() > 24) {
@@ -147,14 +147,7 @@ public class TranslationUtils {
      * Resolves human-readable mod name for a given namespace.
      */
     public static String getModName(String namespace) {
-        if (namespace == null || namespace.isEmpty() || namespace.equals("minecraft")) {
-            return "Minecraft";
-        } else if (namespace.equals("c")) {
-            return "Common";
-        }
-        return FabricLoader.getInstance().getModContainer(namespace)
-                .map(container -> container.getMetadata().getName())
-                .orElse(namespace);
+        return Services.PLATFORM.getModName(namespace);
     }
 
     /**
@@ -162,44 +155,44 @@ public class TranslationUtils {
      */
     public static int getTagSize(Identifier tagId, RegistryType type) {
         if (tagId == null || type == null) return -1;
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
 
         return switch (type) {
-            case ITEM -> Registries.ITEM.getOptional(TagKey.of(RegistryKeys.ITEM, tagId))
-                    .map(RegistryEntryList::size).orElse(-1);
-            case BLOCK -> Registries.BLOCK.getOptional(TagKey.of(RegistryKeys.BLOCK, tagId))
-                    .map(RegistryEntryList::size).orElse(-1);
-            case MOB -> Registries.ENTITY_TYPE.getOptional(TagKey.of(RegistryKeys.ENTITY_TYPE, tagId))
-                    .map(RegistryEntryList::size).orElse(-1);
+            case ITEM -> BuiltInRegistries.ITEM.get(TagKey.create(Registries.ITEM, tagId))
+                    .map(HolderSet.Named::size).orElse(-1);
+            case BLOCK -> BuiltInRegistries.BLOCK.get(TagKey.create(Registries.BLOCK, tagId))
+                    .map(HolderSet.Named::size).orElse(-1);
+            case MOB -> BuiltInRegistries.ENTITY_TYPE.get(TagKey.create(Registries.ENTITY_TYPE, tagId))
+                    .map(HolderSet.Named::size).orElse(-1);
             case BIOME -> {
-                if (client != null && client.world != null) {
-                    yield client.world.getRegistryManager().getOrThrow(RegistryKeys.BIOME)
-                            .getOptional(TagKey.of(RegistryKeys.BIOME, tagId))
-                            .map(RegistryEntryList::size).orElse(-1);
+                if (client != null && client.level != null) {
+                    yield client.level.registryAccess().lookup(Registries.BIOME)
+                            .flatMap(reg -> reg.get(TagKey.create(Registries.BIOME, tagId)))
+                            .map(HolderSet.Named::size).orElse(-1);
                 }
                 yield -1;
             }
             case STRUCTURE -> {
-                if (client != null && client.getServer() != null) {
-                    var opt = client.getServer().getRegistryManager().getOptional(RegistryKeys.STRUCTURE);
+                if (client != null && client.getSingleplayerServer() != null) {
+                    var opt = client.getSingleplayerServer().registryAccess().lookup(Registries.STRUCTURE);
                     if (opt.isPresent()) {
-                        yield opt.get().getOptional(TagKey.of(RegistryKeys.STRUCTURE, tagId))
-                                .map(RegistryEntryList::size).orElse(-1);
+                        yield opt.get().get(TagKey.create(Registries.STRUCTURE, tagId))
+                                .map(HolderSet.Named::size).orElse(-1);
                     }
                 }
                 yield -1;
             }
             case LOOT_TABLE -> {
-                if (tagId.equals(Identifier.of("pacpackquests", "loot_chest"))) {
-                    if (client != null && client.getServer() != null) {
-                        var opt = client.getServer().getReloadableRegistries().createRegistryLookup().getOptional(RegistryKeys.LOOT_TABLE);
+                if (tagId.equals(Identifier.fromNamespaceAndPath("pacpackquests", "loot_chest"))) {
+                    if (client != null && client.getSingleplayerServer() != null) {
+                        var opt = client.getSingleplayerServer().reloadableRegistries().lookup().lookup(Registries.LOOT_TABLE);
                         if (opt.isPresent()) {
-                            yield (int) opt.get().streamKeys()
-                                    .filter(key -> key.getValue().getPath().startsWith("chests/"))
+                            yield (int) opt.get().listElementIds()
+                                    .filter(key -> key.identifier().getPath().startsWith("chests/"))
                                     .count();
                         }
                     }
-                    yield PacPackQuestsClient.SERVER_LOOT_TABLES.size();
+                    yield ClientQuestData.SERVER_LOOT_TABLES.size();
                 }
                 yield -1;
             }

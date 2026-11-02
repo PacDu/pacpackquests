@@ -1,33 +1,34 @@
 package fr.pacdu.pacpackquests.client.screen;
 
+import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.QuestTask;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
-import fr.pacdu.pacpackquests.client.PacPackQuestsClient;
+import fr.pacdu.pacpackquests.client.ClientQuestData;
 import fr.pacdu.pacpackquests.client.gui.ScrollbarWidget;
 import fr.pacdu.pacpackquests.client.util.IconUtils;
 import fr.pacdu.pacpackquests.network.DeleteQuestPayload;
 import fr.pacdu.pacpackquests.network.SaveQuestPayload;
+import fr.pacdu.pacpackquests.platform.Services;
 import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.PathSecurity;
 import fr.pacdu.pacpackquests.util.RegistryType;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.cursor.StandardCursors;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.client.resource.language.I18n;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.tag.TagKey;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,10 +44,10 @@ public class EditQuestScreen extends Screen {
     private final int gridX, gridY;
 
     // Standard Text Fields
-    private TextFieldWidget idField, titleField, reqAmountField, rewardAmountField;
+    private EditBox idField, titleField, reqAmountField, rewardAmountField;
 
     // Selection Buttons
-    private ButtonWidget targetButton, iconButton, parentsButton, rewardButton, taskTypeButton, rewardTypeButton;
+    private Button targetButton, iconButton, parentsButton, rewardButton, taskTypeButton, rewardTypeButton;
 
     // Dropdown
     private boolean isTaskDropdownOpen = false;
@@ -71,7 +72,7 @@ public class EditQuestScreen extends Screen {
     private boolean isIconManuallyEdited = false;
 
     public EditQuestScreen(QuestScreen parent, String questId, String category, int gridX, int gridY) {
-        super(Text.literal(questId == null ? I18n.translate("gui.pacpackquests.create_new_quest") : I18n.translate("gui.pacpackquests.edit_quest")));
+        super(Component.literal(questId == null ? I18n.get("gui.pacpackquests.create_new_quest") : I18n.get("gui.pacpackquests.edit_quest")));
         this.parent = parent;
         this.questId = questId;
         this.category = category;
@@ -102,8 +103,8 @@ public class EditQuestScreen extends Screen {
         String initialParents = "";
 
         // 1. Load data from memory if we are editing a quest
-        if ((questId != null && PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(questId)) || duplicatedQuest != null) {
-            QuestDefinition def = duplicatedQuest != null ? duplicatedQuest : PacPackQuestsClient.CLIENT_DEFINITIONS.get(questId);
+        if ((questId != null && ClientQuestData.CLIENT_DEFINITIONS.containsKey(questId)) || duplicatedQuest != null) {
+            QuestDefinition def = duplicatedQuest != null ? duplicatedQuest : ClientQuestData.CLIENT_DEFINITIONS.get(questId);
             initialTitle = def.title();
 
             if (!this.isInitialized) {
@@ -114,7 +115,7 @@ public class EditQuestScreen extends Screen {
                 if (this.selectedIcon == null || this.selectedIcon.equals("minecraft:stone")) this.selectedIcon = ItemUtils.toCommandString(def.icon());
                 if (this.selectedTarget == null || this.selectedTarget.equals("minecraft:stone")) this.selectedTarget = def.target();
                 if (this.selectedReward == null || this.selectedReward.equals("minecraft:diamond")) this.selectedReward = def.reward();
-                if (this.selectedCommandDescription.isEmpty()) this.selectedCommandDescription = def.commandDescription();
+                if (this.selectedCommandDescription.isEmpty()) this.selectedCommandDescription = def.rewardDescription();
             }
 
             initialReqAmt = String.valueOf(def.requiredAmount());
@@ -125,31 +126,31 @@ public class EditQuestScreen extends Screen {
         this.isInitialized = true;
 
         // 2. Override initial values with current field contents (if they exist)
-        String currentId = this.idField != null ? this.idField.getText() : duplicatedQuest != null ? duplicatedQuest.id() : "";
-        if (this.titleField != null) initialTitle = this.titleField.getText();
-        if (this.reqAmountField != null) initialReqAmt = this.reqAmountField.getText();
-        if (this.rewardAmountField != null) initialRewAmt = this.rewardAmountField.getText();
+        String currentId = this.idField != null ? this.idField.getValue() : duplicatedQuest != null ? duplicatedQuest.id() : "";
+        if (this.titleField != null) initialTitle = this.titleField.getValue();
+        if (this.reqAmountField != null) initialReqAmt = this.reqAmountField.getValue();
+        if (this.rewardAmountField != null) initialRewAmt = this.rewardAmountField.getValue();
         if (this.selectedParents != null) initialParents = String.join(",", this.selectedParents);
 
         // ROW 1: Title & Parents
-        this.titleField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, fieldHeight, Text.translatable("form.pacpackquests.title"));
+        this.titleField = new EditBox(this.font, col1, y, fieldWidth, fieldHeight, Component.translatable("form.pacpackquests.title"));
         this.titleField.setMaxLength(96);
-        this.titleField.setText(initialTitle);
-        this.titleField.setPlaceholder(Text.translatable("form.pacpackquests.title_placeholder").formatted(Formatting.DARK_GRAY));
-        this.addDrawableChild(this.titleField);
+        this.titleField.setValue(initialTitle);
+        this.titleField.setHint(Component.translatable("form.pacpackquests.title_placeholder").withStyle(ChatFormatting.DARK_GRAY));
+        this.addRenderableWidget(this.titleField);
 
-        this.parentsButton = ButtonWidget.builder(Text.literal(initialParents.isEmpty() ? "None" : initialParents.split(",").length + " parents"), button -> {
-            this.client.setScreen(new ParentSelectionScreen(this, this.questId != null ? this.questId : "", this.category, this.selectedParents, this.titleField.getText(), this.gridX, this.gridY, this.selectedIcon));
-        }).dimensions(col2, y, fieldWidth, fieldHeight).build();
-        this.addDrawableChild(this.parentsButton);
+        this.parentsButton = Button.builder(Component.literal(initialParents.isEmpty() ? "None" : initialParents.split(",").length + " parents"), button -> {
+            this.minecraft.setScreen(new ParentSelectionScreen(this, this.questId != null ? this.questId : "", this.category, this.selectedParents, this.titleField.getValue(), this.gridX, this.gridY, this.selectedIcon));
+        }).bounds(col2, y, fieldWidth, fieldHeight).build();
+        this.addRenderableWidget(this.parentsButton);
 
         // ROW 2: Task Type & Reward Type Toggles
         y += yStep - 8;
-        this.taskTypeButton = ButtonWidget.builder(
-                Text.translatable("form.pacpackquests.task_type")
-                        .append(Text.literal(" *").formatted(Formatting.RED))
-                        .append(Text.literal(": "))
-                        .append(Text.translatable("task.pacpackquests." + currentTaskType.name().toLowerCase())),
+        this.taskTypeButton = Button.builder(
+                Component.translatable("form.pacpackquests.task_type")
+                        .append(Component.literal(" *").withStyle(ChatFormatting.RED))
+                        .append(Component.literal(": "))
+                        .append(Component.translatable("task.pacpackquests." + currentTaskType.name().toLowerCase())),
                 button -> {
                     this.isTaskDropdownOpen = !this.isTaskDropdownOpen;
                     if (this.isTaskDropdownOpen) {
@@ -157,14 +158,14 @@ public class EditQuestScreen extends Screen {
                     }
                     this.dropdownScrollbar.resetScroll();
                 }
-        ).dimensions(col1, y, fieldWidth, fieldHeight).build();
-        this.addDrawableChild(this.taskTypeButton);
+        ).bounds(col1, y, fieldWidth, fieldHeight).build();
+        this.addRenderableWidget(this.taskTypeButton);
 
-        this.rewardTypeButton = ButtonWidget.builder(
-                Text.translatable("form.pacpackquests.reward_type")
-                        .append(Text.literal(" *").formatted(Formatting.RED))
-                        .append(Text.literal(": "))
-                        .append(Text.translatable("reward.pacpackquests." + currentRewardType.name().toLowerCase())),
+        this.rewardTypeButton = Button.builder(
+                Component.translatable("form.pacpackquests.reward_type")
+                        .append(Component.literal(" *").withStyle(ChatFormatting.RED))
+                        .append(Component.literal(": "))
+                        .append(Component.translatable("reward.pacpackquests." + currentRewardType.name().toLowerCase())),
                 button -> {
                     this.isRewardDropdownOpen = !this.isRewardDropdownOpen;
                     if (this.isRewardDropdownOpen) {
@@ -172,110 +173,110 @@ public class EditQuestScreen extends Screen {
                     }
                     this.dropdownScrollbar.resetScroll();
                 }
-        ).dimensions(col2, y, fieldWidth, fieldHeight).build();
-        this.addDrawableChild(this.rewardTypeButton);
+        ).bounds(col2, y, fieldWidth, fieldHeight).build();
+        this.addRenderableWidget(this.rewardTypeButton);
 
         // ROW 3: Target Button & Reward Button
         y += yStep;
-        this.targetButton = ButtonWidget.builder(Text.literal(formatDisplayString(getTranslatedName(selectedTarget, getTargetRegistryType()))), button -> {
+        this.targetButton = Button.builder(Component.literal(formatDisplayString(getTranslatedName(selectedTarget, getTargetRegistryType()))), button -> {
             RegistryType ctx = getTargetRegistryType();
-            this.client.setScreen(new SelectionScreen(this, ctx, result -> {
+            this.minecraft.setScreen(new SelectionScreen(this, ctx, result -> {
                 this.selectedTarget = result;
-                this.targetButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(result, ctx))));
+                this.targetButton.setMessage(Component.literal(formatDisplayString(getTranslatedName(result, ctx))));
                 if (!this.isIconManuallyEdited) {
                     this.selectedIcon = ItemUtils.toCommandString(IconUtils.getRepresentativeItem(result, TaskType.getRegistryType(currentTaskType)));
-                    this.iconButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(this.selectedIcon, RegistryType.ITEM))));
+                    this.iconButton.setMessage(Component.literal(formatDisplayString(getTranslatedName(this.selectedIcon, RegistryType.ITEM))));
                 }
             }, this.selectedTarget));
-        }).dimensions(col1, y, fieldWidth, fieldHeight).build();
-        this.addDrawableChild(this.targetButton);
+        }).bounds(col1, y, fieldWidth, fieldHeight).build();
+        this.addRenderableWidget(this.targetButton);
 
-        this.rewardButton = ButtonWidget.builder(Text.literal(""), button -> {
+        this.rewardButton = Button.builder(Component.literal(""), button -> {
             if (currentRewardType == RewardType.COMMAND) {
-                this.client.setScreen(new EditCommandScreen(this, this.selectedReward, this.selectedCommandDescription, (cmd, desc) -> {
+                this.minecraft.setScreen(new EditCommandScreen(this, this.selectedReward, this.selectedCommandDescription, (cmd, desc) -> {
                     this.selectedReward = cmd;
                     this.selectedCommandDescription = desc;
                     updateRewardButtonMessage();
                 }));
             } else {
-                this.client.setScreen(new SelectionScreen(this, RegistryType.ITEM, result -> {
+                this.minecraft.setScreen(new SelectionScreen(this, RegistryType.ITEM, result -> {
                     this.selectedReward = result;
                     updateRewardButtonMessage();
                 }, this.selectedReward, true, true));
             }
-        }).dimensions(col2, y, fieldWidth, fieldHeight).build();
+        }).bounds(col2, y, fieldWidth, fieldHeight).build();
         this.rewardButton.active = (currentRewardType != RewardType.XP && currentRewardType != RewardType.LEVEL);
         updateRewardButtonMessage();
-        this.addDrawableChild(this.rewardButton);
+        this.addRenderableWidget(this.rewardButton);
 
         // ROW 4: Amounts
         y += yStep;
-        this.reqAmountField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, fieldHeight, Text.translatable("form.pacpackquests.required_amount"));
+        this.reqAmountField = new EditBox(this.font, col1, y, fieldWidth, fieldHeight, Component.translatable("form.pacpackquests.required_amount"));
         this.reqAmountField.setMaxLength(7);
-        this.reqAmountField.setTextPredicate(text -> text.matches("^[0-9]*$"));
-        this.reqAmountField.setText(initialReqAmt);
+        this.reqAmountField.setFilter(text -> text.matches("^[0-9]*$"));
+        this.reqAmountField.setValue(initialReqAmt);
         this.reqAmountField.setEditable(this.currentTaskType != TaskType.EXPLORE_DIMENSION && this.currentTaskType != TaskType.EXPLORE_BIOME);
         this.reqAmountField.active = this.currentTaskType != TaskType.EXPLORE_DIMENSION && this.currentTaskType != TaskType.EXPLORE_BIOME;
-        this.addDrawableChild(this.reqAmountField);
+        this.addRenderableWidget(this.reqAmountField);
 
-        this.rewardAmountField = new TextFieldWidget(this.textRenderer, col2, y, fieldWidth, fieldHeight, Text.translatable("form.pacpackquests.reward_amount"));
+        this.rewardAmountField = new EditBox(this.font, col2, y, fieldWidth, fieldHeight, Component.translatable("form.pacpackquests.reward_amount"));
         this.rewardAmountField.setMaxLength(7);
-        this.rewardAmountField.setTextPredicate(text -> text.matches("^[0-9]*$"));
-        this.rewardAmountField.setText(initialRewAmt);
-        this.addDrawableChild(this.rewardAmountField);
+        this.rewardAmountField.setFilter(text -> text.matches("^[0-9]*$"));
+        this.rewardAmountField.setValue(initialRewAmt);
+        this.addRenderableWidget(this.rewardAmountField);
 
         // ROW 5: ID & Icon Button
         y += yStep;
-        this.idField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, fieldHeight, Text.translatable("form.pacpackquests.quest_id")) {
+        this.idField = new EditBox(this.font, col1, y, fieldWidth, fieldHeight, Component.translatable("form.pacpackquests.quest_id")) {
             @Override
-            public void write(String text) {
-                super.write(PathSecurity.formatStringToValidPath(text));
+            public void insertText(String text) {
+                super.insertText(PathSecurity.formatStringToValidPath(text));
             }
         };
         this.idField.setMaxLength(64);
         if (questId != null) {
-            this.idField.setText(questId);
+            this.idField.setValue(questId);
             this.idField.setEditable(false);
             this.idField.active = false;
         } else {
             // Restore the ID typed during the creation of a new quest or the duplication of another one
-            this.idField.setText(currentId);
-            this.idField.setPlaceholder(Text.translatable("form.pacpackquests.quest_id_placeholder").formatted(Formatting.DARK_GRAY));
-            this.idField.setChangedListener(newId -> {
-                if (!this.isIdManuallyEdited && this.idField.isFocused() && !newId.equals(PathSecurity.formatStringToValidPath(this.titleField.getText()))) {
+            this.idField.setValue(currentId);
+            this.idField.setHint(Component.translatable("form.pacpackquests.quest_id_placeholder").withStyle(ChatFormatting.DARK_GRAY));
+            this.idField.setResponder(newId -> {
+                if (!this.isIdManuallyEdited && this.idField.isFocused() && !newId.equals(PathSecurity.formatStringToValidPath(this.titleField.getValue()))) {
                     this.isIdManuallyEdited = true;
                 }
             });
 
             // Add a listener to dynamically change the ID according to the title
-            this.titleField.setChangedListener(newTitle -> {
-                if (!isIdManuallyEdited) this.idField.setText(PathSecurity.formatStringToValidPath(newTitle));
+            this.titleField.setResponder(newTitle -> {
+                if (!isIdManuallyEdited) this.idField.setValue(PathSecurity.formatStringToValidPath(newTitle));
             });
         }
-        this.addDrawableChild(this.idField);
+        this.addRenderableWidget(this.idField);
 
-        this.iconButton = ButtonWidget.builder(Text.literal(formatDisplayString(getTranslatedName(this.selectedIcon, RegistryType.ITEM))), button -> {
-            this.client.setScreen(new SelectionScreen(this, RegistryType.ITEM, result -> {
+        this.iconButton = Button.builder(Component.literal(formatDisplayString(getTranslatedName(this.selectedIcon, RegistryType.ITEM))), button -> {
+            this.minecraft.setScreen(new SelectionScreen(this, RegistryType.ITEM, result -> {
                 this.selectedIcon = result;
-                this.iconButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(result, RegistryType.ITEM))));
+                this.iconButton.setMessage(Component.literal(formatDisplayString(getTranslatedName(result, RegistryType.ITEM))));
                 this.isIconManuallyEdited = true;
             }, this.selectedIcon, false));
-        }).dimensions(col2, y, fieldWidth, fieldHeight).build();
-        this.addDrawableChild(this.iconButton);
+        }).bounds(col2, y, fieldWidth, fieldHeight).build();
+        this.addRenderableWidget(this.iconButton);
 
         // --- BOTTOM ACTION BUTTONS ---
         y += yStep + 8;
-        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.pacpackquests.cancel"), button -> this.client.setScreen(parent))
-                .dimensions(this.width / 2 - 105, y, 60, fieldHeight).build());
+        this.addRenderableWidget(Button.builder(Component.translatable("gui.pacpackquests.cancel"), button -> this.minecraft.setScreen(parent))
+                .bounds(this.width / 2 - 105, y, 60, fieldHeight).build());
 
-        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.pacpackquests.save").formatted(Formatting.GREEN), button -> saveQuest())
-                .dimensions(this.width / 2 - 35, y, 80, fieldHeight).build());
+        this.addRenderableWidget(Button.builder(Component.translatable("gui.pacpackquests.save").withStyle(ChatFormatting.GREEN), button -> saveQuest())
+                .bounds(this.width / 2 - 35, y, 80, fieldHeight).build());
 
         if (questId != null) {
-            this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.pacpackquests.delete").formatted(Formatting.RED), button -> {
-                ClientPlayNetworking.send(new DeleteQuestPayload(questId));
-                this.client.setScreen(parent);
-            }).dimensions(this.width / 2 + 55, y, 60, fieldHeight).build());
+            this.addRenderableWidget(Button.builder(Component.translatable("gui.pacpackquests.delete").withStyle(ChatFormatting.RED), button -> {
+                Services.NETWORK.sendToServer(new DeleteQuestPayload(questId));
+                this.minecraft.setScreen(parent);
+            }).bounds(this.width / 2 + 55, y, 60, fieldHeight).build());
         }
 
         this.duplicatedQuest = null;
@@ -300,7 +301,7 @@ public class EditQuestScreen extends Screen {
             case COMMAND -> RegistryType.COMMAND;
             case XP, LEVEL -> null;
         };
-        this.rewardButton.setMessage(Text.literal(formatDisplayString(getTranslatedRewardName(selectedReward, ctx))));
+        this.rewardButton.setMessage(Component.literal(formatDisplayString(getTranslatedRewardName(selectedReward, ctx))));
     }
 
     // Validity checks are mostly handled by the selection screen now, but we keep this as a safeguard
@@ -309,10 +310,13 @@ public class EditQuestScreen extends Screen {
             Identifier id = Identifier.tryParse(target.substring(1));
             if (id == null) return false;
             return switch (type) {
-                case MINE_BLOCK -> Registries.BLOCK.getOptional(TagKey.of(RegistryKeys.BLOCK, id)).isPresent();
-                case CRAFT_ITEM, OBTAIN_ITEM -> Registries.ITEM.getOptional(TagKey.of(RegistryKeys.ITEM, id)).isPresent();
-                case KILL_MOB -> Registries.ENTITY_TYPE.getOptional(TagKey.of(RegistryKeys.ENTITY_TYPE, id)).isPresent();
-                case EXPLORE_BIOME -> MinecraftClient.getInstance().world.getRegistryManager().getOrThrow(RegistryKeys.BIOME).getOptional(TagKey.of(RegistryKeys.BIOME, id)).isPresent();
+                case MINE_BLOCK -> BuiltInRegistries.BLOCK.get(TagKey.create(Registries.BLOCK, id)).isPresent();
+                case CRAFT_ITEM, OBTAIN_ITEM -> BuiltInRegistries.ITEM.get(TagKey.create(Registries.ITEM, id)).isPresent();
+                case KILL_MOB -> BuiltInRegistries.ENTITY_TYPE.get(TagKey.create(Registries.ENTITY_TYPE, id)).isPresent();
+                case EXPLORE_BIOME -> {
+                    var regOpt = Minecraft.getInstance().level.registryAccess().lookup(Registries.BIOME);
+                    yield regOpt.isPresent() && regOpt.get().get(TagKey.create(Registries.BIOME, id)).isPresent();
+                }
                 case EXPLORE_STRUCTURE -> true;
                 case EXPLORE_DIMENSION -> false;
                 case OPEN_LOOT_CHEST -> target.equals("#pacpackquests:loot_chest");
@@ -322,29 +326,32 @@ public class EditQuestScreen extends Screen {
         if (target.contains("[")) {
             String baseId = target.substring(0, target.indexOf('['));
             Identifier id = Identifier.tryParse(baseId);
-            return id != null && (type == TaskType.CRAFT_ITEM || type == TaskType.OBTAIN_ITEM) && Registries.ITEM.containsId(id);
+            return id != null && (type == TaskType.CRAFT_ITEM || type == TaskType.OBTAIN_ITEM) && BuiltInRegistries.ITEM.containsKey(id);
         }
 
         Identifier id = Identifier.tryParse(target);
         if (id == null) return false;
 
         return switch (type) {
-            case MINE_BLOCK -> Registries.BLOCK.containsId(id);
-            case CRAFT_ITEM, OBTAIN_ITEM -> Registries.ITEM.containsId(id);
-            case KILL_MOB -> Registries.ENTITY_TYPE.containsId(id);
-            case EXPLORE_BIOME -> MinecraftClient.getInstance().world.getRegistryManager().getOrThrow(RegistryKeys.BIOME).containsId(id);
+            case MINE_BLOCK -> BuiltInRegistries.BLOCK.containsKey(id);
+            case CRAFT_ITEM, OBTAIN_ITEM -> BuiltInRegistries.ITEM.containsKey(id);
+            case KILL_MOB -> BuiltInRegistries.ENTITY_TYPE.containsKey(id);
+            case EXPLORE_BIOME -> {
+                var regOpt = Minecraft.getInstance().level.registryAccess().lookup(Registries.BIOME);
+                yield regOpt.isPresent() && regOpt.get().get(ResourceKey.create(Registries.BIOME, id)).isPresent();
+            }
             case EXPLORE_STRUCTURE -> true;
             case EXPLORE_DIMENSION -> {
-                var handler = MinecraftClient.getInstance().getNetworkHandler();
-                yield handler != null && handler.getWorldKeys().stream().anyMatch(key -> key.getValue().equals(id));
+                var handler = Minecraft.getInstance().getConnection();
+                yield handler != null && handler.levels().stream().anyMatch(key -> key.identifier().equals(id));
             }
             case OPEN_LOOT_CHEST -> {
-                var server = MinecraftClient.getInstance().getServer();
+                var server = Minecraft.getInstance().getSingleplayerServer();
                 if (server == null) yield true;
-                var opt = server.getReloadableRegistries().createRegistryLookup().getOptional(RegistryKeys.LOOT_TABLE);
+                var opt = server.reloadableRegistries().lookup().lookup(Registries.LOOT_TABLE);
                 if (opt.isPresent()) {
-                    var key = net.minecraft.registry.RegistryKey.of(RegistryKeys.LOOT_TABLE, id);
-                    yield opt.get().getOptional(key).isPresent();
+                    var key = ResourceKey.create(Registries.LOOT_TABLE, id);
+                    yield opt.get().get(key).isPresent();
                 }
                 yield false;
             }
@@ -353,27 +360,27 @@ public class EditQuestScreen extends Screen {
 
     private void saveQuest() {
         this.errorMessage = null;
-        this.idField.setEditableColor(0xFFE0E0E0);
-        this.titleField.setEditableColor(0xFFE0E0E0);
-        this.reqAmountField.setEditableColor(0xFFE0E0E0);
-        this.rewardAmountField.setEditableColor(0xFFE0E0E0);
+        this.idField.setTextColor(0xFFE0E0E0);
+        this.titleField.setTextColor(0xFFE0E0E0);
+        this.reqAmountField.setTextColor(0xFFE0E0E0);
+        this.rewardAmountField.setTextColor(0xFFE0E0E0);
 
-        String finalId = this.idField.getText().trim();
+        String finalId = this.idField.getValue().trim();
         if (!PathSecurity.isValidIdentifier(finalId)) {
             this.errorMessage = "error.pacpackquests.invalid_id";
-            this.idField.setEditableColor(0xFFFF5555);
+            this.idField.setTextColor(0xFFFF5555);
             return;
         }
 
-        if (this.questId == null && PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(finalId)) {
+        if (this.questId == null && ClientQuestData.CLIENT_DEFINITIONS.containsKey(finalId)) {
             this.errorMessage = "error.pacpackquests.id_already_exists";
-            this.idField.setEditableColor(0xFFFF5555);
+            this.idField.setTextColor(0xFFFF5555);
             return;
         }
 
-        if (this.titleField.getText().trim().isEmpty()) {
+        if (this.titleField.getValue().trim().isEmpty()) {
             this.errorMessage = "error.pacpackquests.missing_title";
-            this.titleField.setEditableColor(0xFFFF5555);
+            this.titleField.setTextColor(0xFFFF5555);
             return;
         }
 
@@ -390,16 +397,16 @@ public class EditQuestScreen extends Screen {
 
         int reqAmt;
         try {
-            reqAmt = Integer.parseInt(this.reqAmountField.getText().trim());
+            reqAmt = Integer.parseInt(this.reqAmountField.getValue().trim());
             if (reqAmt <= 0) throw new NumberFormatException();
             if (currentTaskType == TaskType.OBTAIN_ITEM && reqAmt > 2304) {
                 this.errorMessage = "error.pacpackquests.invalid_object_amount";
-                this.reqAmountField.setEditableColor(0xFFFF5555);
+                this.reqAmountField.setTextColor(0xFFFF5555);
                 return;
             }
         } catch (NumberFormatException e) {
             this.errorMessage = "error.pacpackquests.invalid_amount";
-            this.reqAmountField.setEditableColor(0xFFFF5555);
+            this.reqAmountField.setTextColor(0xFFFF5555);
             return;
         }
 
@@ -412,20 +419,20 @@ public class EditQuestScreen extends Screen {
 
         int rewAmt;
         try {
-            rewAmt = Integer.parseInt(this.rewardAmountField.getText().trim());
+            rewAmt = Integer.parseInt(this.rewardAmountField.getValue().trim());
             if (rewAmt <= 0) throw new NumberFormatException();
             if (currentRewardType == RewardType.ITEM && rewAmt > 2304) {
                 this.errorMessage = "error.pacpackquests.invalid_object_amount";
-                this.rewardAmountField.setEditableColor(0xFFFF5555);
+                this.rewardAmountField.setTextColor(0xFFFF5555);
                 return;
             } else if (currentRewardType == RewardType.COMMAND && rewAmt > 256) {
                 this.errorMessage = "error.pacpackquests.invalid_command_amount";
-                this.rewardAmountField.setEditableColor(0xFFFF5555);
+                this.rewardAmountField.setTextColor(0xFFFF5555);
                 return;
             }
         } catch (NumberFormatException e) {
             this.errorMessage = "error.pacpackquests.invalid_amount";
-            this.rewardAmountField.setEditableColor(0xFFFF5555);
+            this.rewardAmountField.setTextColor(0xFFFF5555);
             return;
         }
 
@@ -438,7 +445,7 @@ public class EditQuestScreen extends Screen {
                     this.errorMessage = "error.pacpackquests.self_parent";
                     return;
                 }
-                if (!PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(parentId)) {
+                if (!ClientQuestData.CLIENT_DEFINITIONS.containsKey(parentId)) {
                     this.errorMessage = "error.pacpackquests.unknown_parent";
                     return;
                 }
@@ -447,43 +454,43 @@ public class EditQuestScreen extends Screen {
         }
 
         java.util.Map<String, String> properties = new java.util.HashMap<>();
-        QuestDefinition existingDef = this.questId != null ? PacPackQuestsClient.CLIENT_DEFINITIONS.get(this.questId) : this.duplicatedQuest;
+        QuestDefinition existingDef = this.questId != null ? ClientQuestData.CLIENT_DEFINITIONS.get(this.questId) : this.duplicatedQuest;
         if (existingDef != null && existingDef.properties() != null) {
             properties.putAll(existingDef.properties());
         }
 
         SaveQuestPayload payload = new SaveQuestPayload(
-                finalId, this.titleField.getText().trim(), this.category,
+                finalId, this.titleField.getValue().trim(), this.category,
                 this.selectedIcon, this.gridX, this.gridY, parentsList,
                 properties,
                 List.of(new QuestTask(this.currentTaskType, this.selectedTarget, reqAmt)),
                 List.of(QuestDefinition.createReward(this.currentRewardType, finalRewardStr, rewAmt, this.selectedCommandDescription))
         );
 
-        ClientPlayNetworking.send(payload);
-        this.client.setScreen(parent);
+        Services.NETWORK.sendToServer(payload);
+        this.minecraft.setScreen(parent);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if ((this.isTaskDropdownOpen || this.isRewardDropdownOpen) && dropdownScrollbar.mouseScrolled(mouseX, mouseY, verticalAmount)) return true;
+        if ((this.isTaskDropdownOpen || this.isRewardDropdownOpen) && dropdownScrollbar.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)) return true;
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     @Override
-    public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+    public boolean mouseDragged(MouseButtonEvent click, double offsetX, double offsetY) {
         if ((this.isTaskDropdownOpen || this.isRewardDropdownOpen) && dropdownScrollbar.mouseDragged(click.x(), click.y(), click.button(), offsetX, offsetY)) return true;
         return super.mouseDragged(click, offsetX, offsetY);
     }
 
     @Override
-    public boolean mouseReleased(Click click) {
+    public boolean mouseReleased(MouseButtonEvent click) {
         if ((this.isTaskDropdownOpen || this.isRewardDropdownOpen) && dropdownScrollbar.mouseReleased(click.x(), click.y(), click.button())) return true;
         return super.mouseReleased(click);
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean doubled) {
+    public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
         if (this.isTaskDropdownOpen && this.taskTypeButton != null) {
             if (handleDropdownClick(click, this.taskTypeButton, TaskType.values(), this::selectTaskType, () -> {
                 this.isTaskDropdownOpen = false;
@@ -506,15 +513,15 @@ public class EditQuestScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyInput input) {
-        if (input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
-            this.client.setScreen(parent);
+    public boolean keyPressed(KeyEvent input) {
+        if (input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+            this.minecraft.setScreen(parent);
             return true;
         }
         return super.keyPressed(input);
     }
 
-    private <E extends Enum<E>> boolean handleDropdownClick(Click click, ButtonWidget button, E[] values, Consumer<E> onSelect, Runnable closeDropdown) {
+    private <E extends Enum<E>> boolean handleDropdownClick(MouseButtonEvent click, Button button, E[] values, Consumer<E> onSelect, Runnable closeDropdown) {
         int dropX = button.getX();
         int dropY = button.getY() + button.getHeight();
         int dropWidth = button.getWidth();
@@ -544,15 +551,15 @@ public class EditQuestScreen extends Screen {
 
     private void selectTaskType(TaskType type) {
         this.currentTaskType = type;
-        this.taskTypeButton.setMessage(Text.translatable("form.pacpackquests.task_type")
-                .append(Text.literal(" *").formatted(Formatting.RED))
-                .append(Text.literal(": "))
-                .append(Text.translatable("task.pacpackquests." + currentTaskType.name().toLowerCase())));
+        this.taskTypeButton.setMessage(Component.translatable("form.pacpackquests.task_type")
+                .append(Component.literal(" *").withStyle(ChatFormatting.RED))
+                .append(Component.literal(": "))
+                .append(Component.translatable("task.pacpackquests." + currentTaskType.name().toLowerCase())));
         this.reqAmountField.setEditable(type != TaskType.EXPLORE_DIMENSION && type != TaskType.EXPLORE_BIOME);
         this.reqAmountField.active = this.currentTaskType != TaskType.EXPLORE_DIMENSION && this.currentTaskType != TaskType.EXPLORE_BIOME;
 
         if (type == TaskType.EXPLORE_DIMENSION || type == TaskType.EXPLORE_BIOME) {
-            this.reqAmountField.setText("1");
+            this.reqAmountField.setValue("1");
         }
 
         this.selectedTarget = switch (type) {
@@ -567,18 +574,18 @@ public class EditQuestScreen extends Screen {
 
         if (!this.isIconManuallyEdited) {
             this.selectedIcon = ItemUtils.toCommandString(IconUtils.getRepresentativeItem(this.selectedTarget, TaskType.getRegistryType(currentTaskType)));
-            this.iconButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(this.selectedIcon, RegistryType.ITEM))));
+            this.iconButton.setMessage(Component.literal(formatDisplayString(getTranslatedName(this.selectedIcon, RegistryType.ITEM))));
         }
 
-        this.targetButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(this.selectedTarget, getTargetRegistryType()))));
+        this.targetButton.setMessage(Component.literal(formatDisplayString(getTranslatedName(this.selectedTarget, getTargetRegistryType()))));
     }
 
     private void selectRewardType(RewardType type) {
         this.currentRewardType = type;
-        this.rewardTypeButton.setMessage(Text.translatable("form.pacpackquests.reward_type")
-                .append(Text.literal(" *").formatted(Formatting.RED))
-                .append(Text.literal(": "))
-                .append(Text.translatable("reward.pacpackquests." + currentRewardType.name().toLowerCase())));
+        this.rewardTypeButton.setMessage(Component.translatable("form.pacpackquests.reward_type")
+                .append(Component.literal(" *").withStyle(ChatFormatting.RED))
+                .append(Component.literal(": "))
+                .append(Component.translatable("reward.pacpackquests." + currentRewardType.name().toLowerCase())));
         this.rewardButton.active = (type != RewardType.XP && type != RewardType.LEVEL);
 
         this.selectedReward = switch (type) {
@@ -591,26 +598,26 @@ public class EditQuestScreen extends Screen {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 10, 0xFFFFFFFF);
+        context.drawCenteredString(this.font, this.title, this.width / 2, 10, 0xFFFFFFFF);
 
-        context.drawText(this.textRenderer, Text.translatable("form.pacpackquests.title").append(Text.literal(" *").formatted(Formatting.RED)), this.titleField.getX(), this.titleField.getY() - 10, 0xFFFFFFFF, true);
-        context.drawText(this.textRenderer, Text.translatable("form.pacpackquests.quest_id"), this.idField.getX(), this.idField.getY() - 10, 0xFFFFFFFF, true);
-        context.drawText(this.textRenderer, Text.translatable("form.pacpackquests.icon"), this.iconButton.getX(), this.iconButton.getY() - 10, 0xFFFFFFFF, true);
-        context.drawText(this.textRenderer, Text.translatable("form.pacpackquests.task_target").append(Text.literal(" *").formatted(Formatting.RED)), this.targetButton.getX(), this.targetButton.getY() - 10, 0xFFFFFFFF, true);
+        context.drawString(this.font, Component.translatable("form.pacpackquests.title").append(Component.literal(" *").withStyle(ChatFormatting.RED)), this.titleField.getX(), this.titleField.getY() - 10, 0xFFFFFFFF, true);
+        context.drawString(this.font, Component.translatable("form.pacpackquests.quest_id"), this.idField.getX(), this.idField.getY() - 10, 0xFFFFFFFF, true);
+        context.drawString(this.font, Component.translatable("form.pacpackquests.icon"), this.iconButton.getX(), this.iconButton.getY() - 10, 0xFFFFFFFF, true);
+        context.drawString(this.font, Component.translatable("form.pacpackquests.task_target").append(Component.literal(" *").withStyle(ChatFormatting.RED)), this.targetButton.getX(), this.targetButton.getY() - 10, 0xFFFFFFFF, true);
 
         if (this.currentRewardType == RewardType.ITEM)
-            context.drawText(this.textRenderer, Text.translatable("form.pacpackquests.reward_item").append(Text.literal(" *").formatted(Formatting.RED)), this.rewardButton.getX(), this.rewardButton.getY() - 10, 0xFFFFFFFF, true);
+            context.drawString(this.font, Component.translatable("form.pacpackquests.reward_item").append(Component.literal(" *").withStyle(ChatFormatting.RED)), this.rewardButton.getX(), this.rewardButton.getY() - 10, 0xFFFFFFFF, true);
         else if (this.currentRewardType == RewardType.COMMAND)
-            context.drawText(this.textRenderer, Text.translatable("form.pacpackquests.reward_command").append(Text.literal(" *").formatted(Formatting.RED)), this.rewardButton.getX(), this.rewardButton.getY() - 10, 0xFFFFFFFF, true);
+            context.drawString(this.font, Component.translatable("form.pacpackquests.reward_command").append(Component.literal(" *").withStyle(ChatFormatting.RED)), this.rewardButton.getX(), this.rewardButton.getY() - 10, 0xFFFFFFFF, true);
 
-        context.drawText(this.textRenderer, Text.translatable("form.pacpackquests.required_amount").append(Text.literal(" *").formatted(Formatting.RED)), this.reqAmountField.getX(), this.reqAmountField.getY() - 10, 0xFFFFFFFF, true);
-        context.drawText(this.textRenderer, Text.translatable("form.pacpackquests.reward_amount").append(Text.literal(" *").formatted(Formatting.RED)), this.rewardAmountField.getX(), this.rewardAmountField.getY() - 10, 0xFFFFFFFF, true);
-        context.drawText(this.textRenderer, Text.translatable("form.pacpackquests.parents"), this.parentsButton.getX(), this.parentsButton.getY() - 10, 0xFFFFFFFF, true);
+        context.drawString(this.font, Component.translatable("form.pacpackquests.required_amount").append(Component.literal(" *").withStyle(ChatFormatting.RED)), this.reqAmountField.getX(), this.reqAmountField.getY() - 10, 0xFFFFFFFF, true);
+        context.drawString(this.font, Component.translatable("form.pacpackquests.reward_amount").append(Component.literal(" *").withStyle(ChatFormatting.RED)), this.rewardAmountField.getX(), this.rewardAmountField.getY() - 10, 0xFFFFFFFF, true);
+        context.drawString(this.font, Component.translatable("form.pacpackquests.parents"), this.parentsButton.getX(), this.parentsButton.getY() - 10, 0xFFFFFFFF, true);
 
         if (this.errorMessage != null) {
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable(this.errorMessage).formatted(Formatting.RED, Formatting.BOLD), this.width / 2, this.height - 52, 0xFFFFFFFF);
+            context.drawCenteredString(this.font, Component.translatable(this.errorMessage).withStyle(ChatFormatting.RED, ChatFormatting.BOLD), this.width / 2, this.height - 52, 0xFFFFFFFF);
         }
 
         // Draw TaskType dropdown menu on top
@@ -623,7 +630,7 @@ public class EditQuestScreen extends Screen {
         }
     }
 
-    private <E extends Enum<E>> void drawDropdownMenu(DrawContext context, int mouseX, int mouseY, ButtonWidget button, E[] values, String type) {
+    private <E extends Enum<E>> void drawDropdownMenu(GuiGraphics context, int mouseX, int mouseY, Button button, E[] values, String type) {
         int dropX = button.getX();
         int dropY = button.getY() + button.getHeight();
         int dropWidth = button.getWidth();
@@ -645,11 +652,11 @@ public class EditQuestScreen extends Screen {
 
         boolean mouseInDropdown = mouseX >= dropX && mouseX <= dropX + totalWidth && mouseY >= dropY && mouseY <= dropY + dropHeight;
         if (mouseInDropdown) {
-            context.setCursor(StandardCursors.ARROW);
+            context.requestCursor(CursorTypes.ARROW);
         }
 
         context.enableScissor(dropX, dropY, dropX + dropWidth, dropY + dropHeight);
-        context.getMatrices().translate(0f, (float) -this.dropdownScrollbar.getScrollAmount());
+        context.pose().translate(0.0f, (float) -this.dropdownScrollbar.getScrollAmount());
 
         for (int i = 0; i < numOptions; i++) {
             int optY = dropY + (i * 20);
@@ -658,12 +665,12 @@ public class EditQuestScreen extends Screen {
 
             if (hovered) {
                 context.fill(dropX, optY, dropX + dropWidth, optY + 20, 0xFF666666);
-                context.setCursor(StandardCursors.POINTING_HAND);
+                context.requestCursor(CursorTypes.POINTING_HAND);
             }
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable(type + ".pacpackquests." + values[i].name().toLowerCase()), dropX + dropWidth / 2, optY + 6, 0xFFFFFFFF);
+            context.drawCenteredString(this.font, Component.translatable(type + ".pacpackquests." + values[i].name().toLowerCase()), dropX + dropWidth / 2, optY + 6, 0xFFFFFFFF);
         }
 
-        context.getMatrices().translate(0f, (float) this.dropdownScrollbar.getScrollAmount());
+        context.pose().translate(0.0f, (float) this.dropdownScrollbar.getScrollAmount());
         context.disableScissor();
 
         this.dropdownScrollbar.setBounds(dropX + dropWidth, dropY, 6, dropHeight);

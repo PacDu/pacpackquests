@@ -1,6 +1,6 @@
 package fr.pacdu.pacpackquests.client.util;
 
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 /**
  * A small utility class for common custom drawings like checkmarks.
@@ -15,7 +15,7 @@ public class DrawUtils {
      * @param y       The y start position.
      * @param size    The total size of the checkmark (width and height).
      */
-    public static void drawCheckmark(DrawContext context, int x, int y, int size) {
+    public static void drawCheckmark(GuiGraphics context, int x, int y, int size) {
         if (size <= 0) return;
 
         // 1. Compute dimensions and bottom vertex coordinates (xv, yv)

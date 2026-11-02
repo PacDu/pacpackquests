@@ -3,16 +3,16 @@ package fr.pacdu.pacpackquests.client.util;
 import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import fr.pacdu.pacpackquests.util.TagUtils;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.World;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -43,8 +43,8 @@ public class IconUtils {
     }
 
     private static ItemStack computeRepresentativeItem(String target, RegistryType type) {
-        World world = MinecraftClient.getInstance().world;
-        RegistryWrapper.WrapperLookup registries = world != null ? world.getRegistryManager() : DynamicRegistryManager.EMPTY;
+        Level world = Minecraft.getInstance().level;
+        HolderLookup.Provider registries = world != null ? world.registryAccess() : RegistryAccess.EMPTY;
 
         boolean isTag = target.startsWith("#");
         String rawTarget = isTag ? target.substring(1) : target;
@@ -54,7 +54,7 @@ public class IconUtils {
 
         Identifier id = Identifier.tryParse(rawTarget);
 
-        if (id == null) return getDefaultFallback(type).getDefaultStack();
+        if (id == null) return getDefaultFallback(type).getDefaultInstance();
 
         // --- 1. EXPLICIT RESOLUTION FOR TANGIBLE TARGETS ---
         switch (type) {
@@ -62,23 +62,23 @@ public class IconUtils {
                 return ItemUtils.fromCommandString(target, registries);
             }
             case BLOCK -> {
-                if (isTag) return TagUtils.getFirstBlockInTag(id).asItem().getDefaultStack();
-                Item blockItem = Registries.BLOCK.get(id).asItem();
-                return blockItem != Items.AIR ? blockItem.getDefaultStack() : Items.BARRIER.getDefaultStack();
+                if (isTag) return TagUtils.getFirstBlockInTag(id).asItem().getDefaultInstance();
+                Item blockItem = BuiltInRegistries.BLOCK.getValue(id).asItem();
+                return blockItem != Items.AIR ? blockItem.getDefaultInstance() : Items.BARRIER.getDefaultInstance();
             }
             case MOB -> {
-                if (id.toString().equals("minecraft:player")) return Items.PLAYER_HEAD.getDefaultStack();
+                if (id.toString().equals("minecraft:player")) return Items.PLAYER_HEAD.getDefaultInstance();
 
                 Identifier eggId;
                 if (isTag) {
-                    Identifier firstEntityId = Registries.ENTITY_TYPE.getId(TagUtils.getFirstEntityTypeInTag(id));
-                    eggId = Identifier.of(firstEntityId.getNamespace(), firstEntityId.getPath() + "_spawn_egg");
+                    Identifier firstEntityId = BuiltInRegistries.ENTITY_TYPE.getKey(TagUtils.getFirstEntityTypeInTag(id));
+                    eggId = Identifier.fromNamespaceAndPath(firstEntityId.getNamespace(), firstEntityId.getPath() + "_spawn_egg");
                 } else {
-                    eggId = Identifier.of(id.getNamespace(), id.getPath() + "_spawn_egg");
+                    eggId = Identifier.fromNamespaceAndPath(id.getNamespace(), id.getPath() + "_spawn_egg");
                 }
 
-                if (Registries.ITEM.containsId(eggId)) return Registries.ITEM.get(eggId).getDefaultStack();
-                return Items.SPAWNER.getDefaultStack();
+                if (BuiltInRegistries.ITEM.containsKey(eggId)) return BuiltInRegistries.ITEM.getValue(eggId).getDefaultInstance();
+                return Items.SPAWNER.getDefaultInstance();
             }
             default -> {}
         }
@@ -95,7 +95,7 @@ public class IconUtils {
 
         if (isVanilla) {
             Item heuristic = getHeuristicIcon(path, type);
-            if (heuristic != null) return heuristic.getDefaultStack();
+            if (heuristic != null) return heuristic.getDefaultInstance();
         }
 
         // Filter out more generic tag words like "taskType", "is", "primary"
@@ -108,13 +108,13 @@ public class IconUtils {
         Item bestMatch = null;
 
         if (!keywords.isEmpty()) {
-            for (Identifier itemId : Registries.ITEM.getIds()) {
+            for (Identifier itemId : BuiltInRegistries.ITEM.keySet()) {
                 if (itemId.getNamespace().equals(searchNamespace)) {
                     String itemPath = itemId.getPath();
                     for (String kw : keywords) {
                         if (itemPath.contains(kw)) {
-                            Item item = Registries.ITEM.get(itemId);
-                            if (item instanceof BlockItem) return item.getDefaultStack();
+                            Item item = BuiltInRegistries.ITEM.getValue(itemId);
+                            if (item instanceof BlockItem) return item.getDefaultInstance();
                             if (bestMatch == null) bestMatch = item;
                         }
                     }
@@ -122,14 +122,14 @@ public class IconUtils {
             }
         }
 
-        if (bestMatch != null) return bestMatch.getDefaultStack();
+        if (bestMatch != null) return bestMatch.getDefaultInstance();
 
         if (!isVanilla) {
             Item heuristic = getHeuristicIcon(path, type);
-            if (heuristic != null) return heuristic.getDefaultStack();
+            if (heuristic != null) return heuristic.getDefaultInstance();
         }
 
-        return getDefaultFallback(type).getDefaultStack();
+        return getDefaultFallback(type).getDefaultInstance();
     }
 
     private static Item getDefaultFallback(RegistryType type) {

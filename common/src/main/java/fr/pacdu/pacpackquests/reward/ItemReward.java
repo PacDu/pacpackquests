@@ -3,13 +3,13 @@ package fr.pacdu.pacpackquests.reward;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.TagUtils;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 
@@ -21,7 +21,7 @@ public record ItemReward(String target, int amount) implements QuestReward {
     }
 
     @Override
-    public void grant(ServerPlayerEntity player, DynamicRegistryManager registryManager) {
+    public void grant(ServerPlayer player, RegistryAccess registryManager) {
         if (target == null || target.isEmpty() || amount <= 0) return;
 
         // Random reward from a tag (e.g. "#minecraft:logs")
@@ -45,30 +45,27 @@ public record ItemReward(String target, int amount) implements QuestReward {
         }
     }
 
-    /**
-     * Safely gives an ItemStack to a player, dropping it at their feet if the inventory is full.
-     */
-    private void giveItemStack(ServerPlayerEntity player, ItemStack stack) {
+    private void giveItemStack(ServerPlayer player, ItemStack stack) {
         if (stack.isEmpty()) return;
-        if (!player.getInventory().insertStack(stack)) {
-            player.dropItem(stack, false);
+        if (!player.getInventory().add(stack)) {
+            player.drop(stack, false);
         }
     }
 
     @Override
-    public ItemStack createIconStack(RegistryWrapper.WrapperLookup registries) {
+    public ItemStack createIconStack(HolderLookup.Provider registries) {
         if (target == null || target.isEmpty()) return ItemStack.EMPTY;
         return ItemUtils.fromCommandString(target, registries);
     }
 
     @Override
-    public void write(PacketByteBuf buf) {
-        buf.writeEnumConstant(RewardType.ITEM);
-        buf.writeString(target != null ? target : "");
+    public void write(FriendlyByteBuf buf) {
+        buf.writeEnum(RewardType.ITEM);
+        buf.writeUtf(target != null ? target : "");
         buf.writeInt(amount);
     }
 
-    public static ItemReward read(PacketByteBuf buf) {
-        return new ItemReward(buf.readString(), buf.readInt());
+    public static ItemReward read(FriendlyByteBuf buf) {
+        return new ItemReward(buf.readUtf(), buf.readInt());
     }
 }

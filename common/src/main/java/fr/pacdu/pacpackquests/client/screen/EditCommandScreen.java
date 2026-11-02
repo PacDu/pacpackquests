@@ -1,15 +1,15 @@
 package fr.pacdu.pacpackquests.client.screen;
 
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.Element;
-import net.minecraft.client.gui.screen.ChatInputSuggestor;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CommandSuggestions;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 
 import java.util.function.BiConsumer;
 
@@ -20,11 +20,11 @@ public class EditCommandScreen extends Screen {
     private final String previousDescription;
     private final BiConsumer<String, String> onEdited;
 
-    private TextFieldWidget commandField, commandDescriptionField;
-    private ChatInputSuggestor commandSuggestor;
+    private EditBox commandField, commandDescriptionField;
+    private CommandSuggestions commandSuggestor;
 
     protected EditCommandScreen(Screen parent, String previousCommand, String previousDescription, BiConsumer<String, String> onEdited) {
-        super(Text.translatable("gui.pacpackquests.edit_command"));
+        super(Component.translatable("gui.pacpackquests.edit_command"));
         this.parent = parent;
         this.previousCommand = previousCommand;
         this.previousDescription = previousDescription;
@@ -37,38 +37,42 @@ public class EditCommandScreen extends Screen {
 
         int commandFieldWidth = (int) Math.clamp(this.width * 0.8, 200, 2000);
 
-        this.commandField = new TextFieldWidget(this.textRenderer, (this.width - commandFieldWidth) / 2, 50, commandFieldWidth, 20, Text.empty());
+        this.commandField = new EditBox(this.font, (this.width - commandFieldWidth) / 2, 50, commandFieldWidth, 20, Component.empty());
         this.commandField.setMaxLength(16384);
-        this.commandField.setText(this.previousCommand);
-        this.commandField.setPlaceholder(Text.translatable("form.pacpackquests.reward_command_placeholder").formatted(Formatting.DARK_GRAY));
-        this.commandField.setChangedListener(text -> this.commandSuggestor.refresh());
-        this.addDrawableChild(this.commandField);
+        this.commandField.setValue(this.previousCommand != null ? this.previousCommand : "");
+        this.commandField.setHint(Component.translatable("form.pacpackquests.reward_command_placeholder").withStyle(ChatFormatting.DARK_GRAY));
+        this.commandField.setResponder(text -> {
+            if (this.commandSuggestor != null) {
+                this.commandSuggestor.updateCommandInfo();
+            }
+        });
+        this.addRenderableWidget(this.commandField);
 
-        this.commandSuggestor = new ChatInputSuggestor(this.client, this, this.commandField, this.textRenderer, true, true, 0, 7, false, Integer.MIN_VALUE);
-        this.commandSuggestor.setWindowActive(true);
-        this.commandSuggestor.refresh();
+        this.commandSuggestor = new CommandSuggestions(this.minecraft, this, this.commandField, this.font, true, true, 0, 7, false, Integer.MIN_VALUE);
+        this.commandSuggestor.setAllowSuggestions(true);
+        this.commandSuggestor.updateCommandInfo();
         this.setFocused(this.commandField);
 
-        this.commandDescriptionField = new TextFieldWidget(this.textRenderer, (this.width - commandFieldWidth) / 2, this.commandField.getY() + 120, commandFieldWidth, 20, Text.empty());
+        this.commandDescriptionField = new EditBox(this.font, (this.width - commandFieldWidth) / 2, this.commandField.getY() + 120, commandFieldWidth, 20, Component.empty());
         this.commandDescriptionField.setMaxLength(256);
-        this.commandDescriptionField.setText(this.previousDescription != null ? this.previousDescription : "");
-        this.addDrawableChild(this.commandDescriptionField);
+        this.commandDescriptionField.setValue(this.previousDescription != null ? this.previousDescription : "");
+        this.addRenderableWidget(this.commandDescriptionField);
 
-        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.pacpackquests.cancel"), button -> this.client.setScreen(this.parent))
-                .dimensions((this.width - 100) / 2 - 60, this.height - 30, 100, 20).build());
-        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.pacpackquests.validate"), button -> {
-            this.onEdited.accept(this.commandField.getText(), this.commandDescriptionField.getText());
-            this.client.setScreen(this.parent);
-        }).dimensions((this.width - 100) / 2 + 60, this.height - 30, 100, 20).build());
+        this.addRenderableWidget(Button.builder(Component.translatable("gui.pacpackquests.cancel"), button -> this.minecraft.setScreen(this.parent))
+                .bounds((this.width - 100) / 2 - 60, this.height - 30, 100, 20).build());
+        this.addRenderableWidget(Button.builder(Component.translatable("gui.pacpackquests.validate"), button -> {
+            this.onEdited.accept(this.commandField.getValue(), this.commandDescriptionField.getValue());
+            this.minecraft.setScreen(this.parent);
+        }).bounds((this.width - 100) / 2 + 60, this.height - 30, 100, 20).build());
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float deltaTicks) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float deltaTicks) {
         super.render(context, mouseX, mouseY, deltaTicks);
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 15, 0xFFFFFFFF);
+        context.drawCenteredString(this.font, this.title, this.width / 2, 15, 0xFFFFFFFF);
 
-        context.drawText(this.textRenderer, Text.translatable("form.pacpackquests.command").append(Text.literal(" *").formatted(Formatting.RED)), this.commandField.getX(), this.commandField.getY() - 10, 0xFFFFFFFF, true);
-        context.drawText(this.textRenderer, Text.translatable("form.pacpackquests.command_description"), this.commandDescriptionField.getX(), this.commandDescriptionField.getY() - 10, 0xFFFFFFFF, true);
+        context.drawString(this.font, Component.translatable("form.pacpackquests.command").append(Component.literal(" *").withStyle(ChatFormatting.RED)), this.commandField.getX(), this.commandField.getY() - 10, 0xFFFFFFFF, true);
+        context.drawString(this.font, Component.translatable("form.pacpackquests.command_description"), this.commandDescriptionField.getX(), this.commandDescriptionField.getY() - 10, 0xFFFFFFFF, true);
 
         if (this.commandField.isFocused()) {
             this.commandSuggestor.render(context, mouseX, mouseY);
@@ -78,19 +82,21 @@ public class EditCommandScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyInput input) {
+    public boolean keyPressed(KeyEvent input) {
         if (this.commandField.isFocused() && this.commandSuggestor.keyPressed(input)) {
             return true;
         }
         return super.keyPressed(input);
     }
+
     @Override
-    public boolean mouseClicked(Click click, boolean doubled) {
+    public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
         if (this.commandField.isFocused() && this.commandSuggestor.mouseClicked(click)) {
             return true;
         }
         return super.mouseClicked(click, doubled);
     }
+
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         if (this.commandField.isFocused() && this.commandSuggestor.mouseScrolled(verticalAmount)) {
@@ -100,13 +106,13 @@ public class EditCommandScreen extends Screen {
     }
 
     @Override
-    public void setFocused(Element focused) {
+    public void setFocused(GuiEventListener focused) {
         super.setFocused(focused);
         if (this.commandSuggestor != null) {
             boolean isCommandFocused = (focused == this.commandField);
-            this.commandSuggestor.setWindowActive(isCommandFocused);
+            this.commandSuggestor.setAllowSuggestions(isCommandFocused);
             if (isCommandFocused) {
-                this.commandSuggestor.refresh();
+                this.commandSuggestor.updateCommandInfo();
             } else {
                 this.commandField.setSuggestion(null);
             }

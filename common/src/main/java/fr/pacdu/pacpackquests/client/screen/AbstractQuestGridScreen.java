@@ -1,10 +1,11 @@
 package fr.pacdu.pacpackquests.client.screen;
 
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
+import com.mojang.math.Axis;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 
@@ -35,7 +36,7 @@ public abstract class AbstractQuestGridScreen extends Screen {
 
     protected abstract List<? extends GridNode> getNodes();
 
-    protected AbstractQuestGridScreen(Text title) {
+    protected AbstractQuestGridScreen(Component title) {
         super(title);
     }
 
@@ -53,8 +54,8 @@ public abstract class AbstractQuestGridScreen extends Screen {
     protected void init() {
         super.init();
 
-        int maxTabWidth = this.textRenderer.getWidth("M".repeat(categoryNameMaxChars)) + 12;
-        int winWidthPx = (this.client != null && this.client.getWindow() != null) ? this.client.getWindow().getFramebufferWidth() : 1920;
+        int maxTabWidth = this.font.width("M".repeat(categoryNameMaxChars)) + 12;
+        int winWidthPx = (this.minecraft != null && this.minecraft.getWindow() != null) ? this.minecraft.getWindow().getScreenWidth() : 1920;
         float factor = Math.clamp((winWidthPx - 854f) / (1920f - 854f), 0.0f, 1.0f);
         this.tabWidth = Math.round(90 + factor * (maxTabWidth - 90));
 
@@ -66,7 +67,7 @@ public abstract class AbstractQuestGridScreen extends Screen {
 
     // --- INPUT HANDLING FOR PAN & ZOOM ---
     @Override
-    public boolean mouseDragged(Click click, double deltaX, double deltaY) {
+    public boolean mouseDragged(MouseButtonEvent click, double deltaX, double deltaY) {
         // If left click and we are hovering the canvas, we pan.
         // Child classes can intercept this beforehand if they want dragging nodes instead.
         if (click.x() >= startX && click.x() <= startX + windowWidth && click.y() >= startY && click.y() <= startY + windowHeight) {
@@ -264,23 +265,23 @@ public abstract class AbstractQuestGridScreen extends Screen {
 
     // --- RENDER HELPERS ---
 
-    protected void drawBackgroundFrame(DrawContext context, Text titleText) {
+    protected void drawBackgroundFrame(GuiGraphics context, Component titleText) {
         // Dark translucent background
         context.fill(startX, startY, startX + windowWidth, startY + windowHeight, 0xAA000000);
         // Title at the top
         if (titleText != null) {
-            context.drawCenteredTextWithShadow(this.textRenderer, titleText, this.width / 2, startY - 18, -1);
+            context.drawCenteredString(this.font, titleText, this.width / 2, startY - 18, -1);
         }
     }
 
-    protected void renderNodeBase(DrawContext context, GridNode node, int bgColor) {
+    protected void renderNodeBase(GuiGraphics context, GridNode node, int bgColor) {
         context.fill(node.x() - 4, node.y() - 4, node.x() + 20, node.y() + 20, bgColor);
         if (node.icon() != null) {
-            context.drawItem(node.icon(), node.x(), node.y());
+            context.renderItem(node.icon(), node.x(), node.y());
         }
     }
 
-    protected void drawConnectionLine(DrawContext context, GridNode parent, GridNode child, int lineColor, int arrowColor, boolean isDragging) {
+    protected void drawConnectionLine(GuiGraphics context, GridNode parent, GridNode child, int lineColor, int arrowColor, boolean isDragging) {
         int px = parent.x() + 8;
         int py = parent.y() + 8;
         int cx = child.x() + 8;
@@ -295,17 +296,17 @@ public abstract class AbstractQuestGridScreen extends Screen {
         float length = (float) Math.sqrt(dx * dx + dy * dy);
         float angle = (float) Math.atan2(dy, dx);
 
-        context.getMatrices().pushMatrix();
-        context.getMatrices().translate((float) px, (float) py);
-        context.getMatrices().rotate(angle);
+        context.pose().pushMatrix();
+        context.pose().translate((float) px, (float) py);
+        context.pose().rotate(angle);
 
         context.fill(0, -thickness / 2, (int) length, thickness / 2, lineColor);
         drawArrowChevron(context, (int) (length / 2) + 4, arrowColor);
 
-        context.getMatrices().popMatrix();
+        context.pose().popMatrix();
     }
 
-    private void drawArrowChevron(DrawContext context, int x, int color) {
+    private void drawArrowChevron(GuiGraphics context, int x, int color) {
         context.fill(x, -1, x + 2, 1, color);
         context.fill(x - 2, -3, x, -1, color);
         context.fill(x - 2, 1, x, 3, color);

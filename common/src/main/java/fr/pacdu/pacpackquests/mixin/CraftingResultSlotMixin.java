@@ -1,14 +1,14 @@
 package fr.pacdu.pacpackquests.mixin;
 
+import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.TaskType;
 import fr.pacdu.pacpackquests.data.QuestManager;
 import fr.pacdu.pacpackquests.data.QuestProgressHandler;
-import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.util.ItemUtils;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.slot.CraftingResultSlot;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.ResultSlot;
+import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -16,28 +16,23 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(CraftingResultSlot.class)
+@Mixin(ResultSlot.class)
 public class CraftingResultSlotMixin {
 
-    // The @Shadow annotation allows access to the private variables of the original class
-    @Shadow @Final private PlayerEntity player;
-    @Shadow private int amount;
+    @Shadow @Final private Player player;
+    @Shadow private int removeCount;
 
-    // We inject into the game's internal statistics method
-    @Inject(method = "onCrafted(Lnet/minecraft/item/ItemStack;)V", at = @At("HEAD"))
+    @Inject(method = "checkTakeAchievements(Lnet/minecraft/world/item/ItemStack;)V", at = @At("HEAD"))
     private void onCraftedItem(ItemStack stack, CallbackInfo ci) {
-        if (!this.player.getEntityWorld().isClient() && this.player instanceof ServerPlayerEntity serverPlayer) {
-
-            // Anti-air security
+        if (!this.player.level().isClientSide() && this.player instanceof ServerPlayer serverPlayer) {
             if (stack.isEmpty()) return;
 
             for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
                 if (quest.taskType() == TaskType.CRAFT_ITEM) {
                     String target = quest.target().trim();
-                    boolean isTarget = ItemUtils.matches(stack, target, serverPlayer.getEntityWorld().getRegistryManager());
+                    boolean isTarget = ItemUtils.matches(stack, target, serverPlayer.level().registryAccess());
                     if (isTarget) {
-                        // “this.amount” contains the exact number of items selected (required for Shift-click)
-                        int count = this.amount > 0 ? this.amount : stack.getCount();
+                        int count = this.removeCount > 0 ? this.removeCount : stack.getCount();
                         QuestProgressHandler.incrementProgress(serverPlayer, quest, count);
                     }
                 }

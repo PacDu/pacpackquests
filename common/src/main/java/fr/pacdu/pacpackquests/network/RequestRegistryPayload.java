@@ -1,26 +1,28 @@
 package fr.pacdu.pacpackquests.network;
 
+import fr.pacdu.pacpackquests.Constants;
+
 import fr.pacdu.pacpackquests.util.RegistryType;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
-public record RequestRegistryPayload(RegistryType type) implements CustomPayload {
+public record RequestRegistryPayload(RegistryType registryType) implements CustomPacketPayload {
 
-    public static final Id<RequestRegistryPayload> ID = new Id<>(Identifier.of("pacpackquests", "req_registry"));
+    public static final Type<RequestRegistryPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(Constants.MOD_ID, "req_registry"));
 
-    public static final PacketCodec<RegistryByteBuf, RequestRegistryPayload> CODEC = PacketCodec.of(
-            (value, buf) -> {
-                buf.writeEnumConstant(value.type());
+    public static final StreamCodec<RegistryFriendlyByteBuf, RequestRegistryPayload> CODEC = StreamCodec.of(
+            (buf, value) -> {
+                buf.writeEnum(value.registryType());
             },
             buf -> new RequestRegistryPayload(
-                    buf.readEnumConstant(RegistryType.class)
+                    buf.readEnum(RegistryType.class)
             )
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

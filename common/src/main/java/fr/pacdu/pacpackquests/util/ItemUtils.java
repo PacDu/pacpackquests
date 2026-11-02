@@ -1,19 +1,19 @@
 package fr.pacdu.pacpackquests.util;
 
 import com.mojang.brigadier.StringReader;
-import fr.pacdu.pacpackquests.PacPackQuests;
-import net.minecraft.command.argument.ItemStringReader;
-import net.minecraft.command.argument.ItemStackArgument;
-import net.minecraft.component.ComponentChanges;
-import net.minecraft.component.ComponentType;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.ItemEnchantmentsComponent;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.registry.tag.TagKey;
-import net.minecraft.util.Identifier;
+import fr.pacdu.pacpackquests.Constants;
+import net.minecraft.commands.arguments.item.ItemInput;
+import net.minecraft.commands.arguments.item.ItemParser;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -26,14 +26,12 @@ import java.util.Optional;
  */
 public final class ItemUtils {
 
-    private static RegistryWrapper.WrapperLookup STATIC_LOOKUP;
+    private static HolderLookup.Provider STATIC_LOOKUP;
     private static final Map<String, ItemStack> STACK_CACHE = new HashMap<>();
 
-    public static RegistryWrapper.WrapperLookup getStaticLookup() {
+    public static HolderLookup.Provider getStaticLookup() {
         if (STATIC_LOOKUP == null) {
-            STATIC_LOOKUP = RegistryWrapper.WrapperLookup.of(
-                    Registries.REGISTRIES.stream().map(r -> (RegistryWrapper.Impl<?>) r)
-            );
+            STATIC_LOOKUP = net.minecraft.core.RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
         }
         return STATIC_LOOKUP;
     }
@@ -50,22 +48,22 @@ public final class ItemUtils {
      * "minecraft:enchanted_book[stored_enchantments={levels:{'minecraft:feather_falling':4}}]"
      * If no components are modified, returns simple "namespace:path".
      */
-    public static String toCommandString(ItemStack stack, RegistryWrapper.WrapperLookup registries) {
+    public static String toCommandString(ItemStack stack, HolderLookup.Provider registries) {
         if (stack == null || stack.isEmpty()) {
             return "minecraft:air";
         }
 
         // If no components were changed from default, return standard identifier
-        if (stack.getComponentChanges().isEmpty()) {
-            return Registries.ITEM.getId(stack.getItem()).toString();
+        if (stack.getComponentsPatch().isEmpty()) {
+            return BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
         }
 
-        RegistryWrapper.WrapperLookup lookup = registries != null ? registries : getStaticLookup();
+        HolderLookup.Provider lookup = registries != null ? registries : getStaticLookup();
         try {
-            return new ItemStackArgument(stack.getRegistryEntry(), stack.getComponentChanges()).asString(lookup);
+            return new ItemInput(stack.getItemHolder(), stack.getComponentsPatch()).serialize(lookup);
         } catch (Exception e) {
-            PacPackQuests.LOGGER.warn("Failed to serialize item to command string: {}", stack, e);
-            return Registries.ITEM.getId(stack.getItem()).toString();
+            Constants.LOG.warn("Failed to serialize item to command string: {}", stack, e);
+            return BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
         }
     }
 
@@ -76,7 +74,7 @@ public final class ItemUtils {
      * - Tags: "#namespace:tag_name" (returns representative first item)
      * - Standard items: "namespace:path"
      */
-    public static ItemStack fromCommandString(String itemString, RegistryWrapper.WrapperLookup registries) {
+    public static ItemStack fromCommandString(String itemString, HolderLookup.Provider registries) {
         if (itemString == null || itemString.isEmpty() || itemString.equals("minecraft:air")) {
             return ItemStack.EMPTY;
         }
@@ -89,29 +87,29 @@ public final class ItemUtils {
 
         // 2. Modern syntax with Data Components [...]
         if (itemString.contains("[")) {
-            RegistryWrapper.WrapperLookup lookup = registries != null ? registries : getStaticLookup();
+            HolderLookup.Provider lookup = registries != null ? registries : getStaticLookup();
             try {
-                ItemStringReader reader = new ItemStringReader(lookup);
-                ItemStringReader.ItemResult result = reader.consume(new StringReader(itemString));
+                ItemParser reader = new ItemParser(lookup);
+                ItemParser.ItemResult result = reader.parse(new StringReader(itemString));
                 ItemStack stack = new ItemStack(result.item());
-                stack.applyChanges(result.components());
+                stack.applyComponentsAndValidate(result.components());
                 return stack;
             } catch (Exception e) {
-                PacPackQuests.LOGGER.warn("Failed to parse item with components: {}", itemString, e);
+                Constants.LOG.warn("Failed to parse item with components: {}", itemString, e);
             }
             // Fallback to base item if components failed to parse
             int bracketIndex = itemString.indexOf('[');
             Identifier baseId = Identifier.tryParse(itemString.substring(0, bracketIndex));
-            if (baseId != null && Registries.ITEM.containsId(baseId)) {
-                return new ItemStack(Registries.ITEM.get(baseId));
+            if (baseId != null && BuiltInRegistries.ITEM.containsKey(baseId)) {
+                return new ItemStack(BuiltInRegistries.ITEM.getValue(baseId));
             }
             return ItemStack.EMPTY;
         }
 
         // 3. Standard item ID
         Identifier id = Identifier.tryParse(itemString);
-        if (id != null && Registries.ITEM.containsId(id)) {
-            return new ItemStack(Registries.ITEM.get(id));
+        if (id != null && BuiltInRegistries.ITEM.containsKey(id)) {
+            return new ItemStack(BuiltInRegistries.ITEM.getValue(id));
         }
 
         return ItemStack.EMPTY;
@@ -121,7 +119,7 @@ public final class ItemUtils {
      * Checks if a player's ItemStack satisfies a quest target requirement.
      * Handles tags, component matching (e.g. enchanted book level, potion contents), and standard items.
      */
-    public static boolean matches(ItemStack playerStack, String target, RegistryWrapper.WrapperLookup registries) {
+    public static boolean matches(ItemStack playerStack, String target, HolderLookup.Provider registries) {
         if (playerStack == null || playerStack.isEmpty() || target == null || target.isEmpty()) {
             return false;
         }
@@ -129,7 +127,7 @@ public final class ItemUtils {
         // 1. Check item tag (#)
         if (target.startsWith("#")) {
             Identifier tagId = Identifier.tryParse(target.substring(1));
-            return tagId != null && playerStack.isIn(TagKey.of(RegistryKeys.ITEM, tagId));
+            return tagId != null && playerStack.is(TagKey.create(Registries.ITEM, tagId));
         }
 
         // 2. Target with components [...]
@@ -147,20 +145,20 @@ public final class ItemUtils {
 
         // 3. Standard item comparison
         Identifier targetId = Identifier.tryParse(target);
-        return targetId != null && Registries.ITEM.getId(playerStack.getItem()).equals(targetId);
+        return targetId != null && BuiltInRegistries.ITEM.getKey(playerStack.getItem()).equals(targetId);
     }
 
     /**
      * Compares an item and its components against a target template stack.
      */
     private static boolean matchesComponents(ItemStack playerStack, ItemStack targetStack) {
-        if (!playerStack.isOf(targetStack.getItem())) {
+        if (!playerStack.is(targetStack.getItem())) {
             return false;
         }
 
-        ComponentChanges targetChanges = targetStack.getComponentChanges();
+        DataComponentPatch targetChanges = targetStack.getComponentsPatch();
         for (var entry : targetChanges.entrySet()) {
-            ComponentType<?> type = entry.getKey();
+            DataComponentType<?> type = entry.getKey();
             Optional<?> expectedOptional = entry.getValue();
 
             if (expectedOptional.isPresent()) {
@@ -171,8 +169,8 @@ public final class ItemUtils {
                 }
 
                 // If comparing stored enchantments, allow equal or higher level
-                if (type == DataComponentTypes.STORED_ENCHANTMENTS && expected instanceof ItemEnchantmentsComponent expEnch && actual instanceof ItemEnchantmentsComponent actEnch) {
-                    for (var enchEntry : expEnch.getEnchantmentEntries()) {
+                if (type == DataComponents.STORED_ENCHANTMENTS && expected instanceof ItemEnchantments expEnch && actual instanceof ItemEnchantments actEnch) {
+                    for (var enchEntry : expEnch.entrySet()) {
                         if (actEnch.getLevel(enchEntry.getKey()) < enchEntry.getIntValue()) {
                             return false;
                         }

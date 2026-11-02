@@ -1,6 +1,6 @@
 package fr.pacdu.pacpackquests;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 
 /**
  * Represents an individual task or objective within a quest (e.g. mine a block, craft an item, visit a biome).
@@ -12,15 +12,15 @@ public record QuestTask(TaskType type, String target, int requiredAmount) {
         return new QuestTask(type, target, requiredAmount);
     }
 
-    public void write(PacketByteBuf buf) {
-        buf.writeEnumConstant(this.type);
-        buf.writeString(this.target != null ? this.target : "");
+    public void write(FriendlyByteBuf buf) {
+        buf.writeEnum(this.type);
+        buf.writeUtf(this.target != null ? this.target : "");
         buf.writeInt(this.requiredAmount);
     }
 
-    public static QuestTask read(PacketByteBuf buf) {
-        TaskType type = buf.readEnumConstant(TaskType.class);
-        String target = buf.readString();
+    public static QuestTask read(FriendlyByteBuf buf) {
+        TaskType type = buf.readEnum(TaskType.class);
+        String target = buf.readUtf();
         int requiredAmount = buf.readInt();
         return new QuestTask(type, target, requiredAmount);
     }

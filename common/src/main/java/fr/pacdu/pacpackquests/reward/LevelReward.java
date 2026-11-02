@@ -1,12 +1,12 @@
 package fr.pacdu.pacpackquests.reward;
 
 import fr.pacdu.pacpackquests.RewardType;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 public record LevelReward(int amount) implements QuestReward {
 
@@ -16,24 +16,24 @@ public record LevelReward(int amount) implements QuestReward {
     }
 
     @Override
-    public void grant(ServerPlayerEntity player, DynamicRegistryManager registryManager) {
+    public void grant(ServerPlayer player, RegistryAccess registryManager) {
         if (player != null && amount > 0) {
-            player.addExperienceLevels(amount);
+            player.giveExperienceLevels(amount);
         }
     }
 
     @Override
-    public ItemStack createIconStack(RegistryWrapper.WrapperLookup registries) {
+    public ItemStack createIconStack(HolderLookup.Provider registries) {
         return new ItemStack(Items.ENCHANTED_BOOK);
     }
 
     @Override
-    public void write(PacketByteBuf buf) {
-        buf.writeEnumConstant(RewardType.LEVEL);
+    public void write(FriendlyByteBuf buf) {
+        buf.writeEnum(RewardType.LEVEL);
         buf.writeInt(amount);
     }
 
-    public static LevelReward read(PacketByteBuf buf) {
+    public static LevelReward read(FriendlyByteBuf buf) {
         return new LevelReward(buf.readInt());
     }
 }

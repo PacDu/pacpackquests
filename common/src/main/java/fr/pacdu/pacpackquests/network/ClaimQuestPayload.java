@@ -1,21 +1,23 @@
 package fr.pacdu.pacpackquests.network;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import fr.pacdu.pacpackquests.Constants;
 
-public record ClaimQuestPayload(String questId) implements CustomPayload {
-    public static final Id<ClaimQuestPayload> ID = new Id<>(Identifier.of("pacpackquests", "claim_quest"));
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
-    public static final PacketCodec<RegistryByteBuf, ClaimQuestPayload> CODEC = PacketCodec.tuple(
-            PacketCodecs.STRING, ClaimQuestPayload::questId,
+public record ClaimQuestPayload(String questId) implements CustomPacketPayload {
+    public static final Type<ClaimQuestPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(Constants.MOD_ID, "claim_quest"));
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, ClaimQuestPayload> CODEC = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, ClaimQuestPayload::questId,
             ClaimQuestPayload::new
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

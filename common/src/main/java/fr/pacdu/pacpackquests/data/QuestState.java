@@ -4,13 +4,12 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.network.QuestCompletedPayload;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.datafixer.DataFixTypes;
+import fr.pacdu.pacpackquests.platform.Services;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.world.PersistentState;
-import net.minecraft.world.PersistentStateType;
-import net.minecraft.world.World;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
 
 import java.util.*;
 
@@ -18,7 +17,7 @@ import java.util.*;
  * Represents the persistent save data for all players' quest progress.
  * This state is saved to the world's data folder (data/pacpackquests_data.dat).
  */
-public class QuestState extends PersistentState {
+public class QuestState extends SavedData {
 
     // Structure: Player UUID -> (Quest ID -> Value)
     public final Map<UUID, Map<String, Integer>> progress = new HashMap<>();
@@ -31,20 +30,20 @@ public class QuestState extends PersistentState {
         return progress.getOrDefault(player, new HashMap<>()).getOrDefault(questId, 0);
     }
 
-    public void setProgress(ServerPlayerEntity player, String questId, int amount) {
+    public void setProgress(ServerPlayer player, String questId, int amount) {
         QuestDefinition quest = QuestManager.LOADED_QUESTS.get(questId);
         if (quest == null) return;
 
-        int oldProgress = this.getProgress(player.getUuid(), questId);
+        int oldProgress = this.getProgress(player.getUUID(), questId);
 
         // Save the new progress
-        progress.computeIfAbsent(player.getUuid(), k -> new HashMap<>()).put(questId, amount);
-        this.markDirty();
+        progress.computeIfAbsent(player.getUUID(), k -> new HashMap<>()).put(questId, amount);
+        this.setDirty();
 
         // Check if the quest just crossed the completion threshold
         if (oldProgress < quest.requiredAmount() && amount >= quest.requiredAmount()) {
             // Trigger the achievement toast on the client!
-            ServerPlayNetworking.send(player, new QuestCompletedPayload(questId));
+            Services.NETWORK.sendToPlayer(player, new QuestCompletedPayload(questId));
         }
     }
 
@@ -61,7 +60,7 @@ public class QuestState extends PersistentState {
 
     public void setClaimed(UUID player, String questId, boolean isClaimed) {
         claimed.computeIfAbsent(player, k -> new HashMap<>()).put(questId, isClaimed);
-        this.markDirty();
+        this.setDirty();
     }
 
     // --- New Methods for Structure Tracking ---
@@ -77,7 +76,7 @@ public class QuestState extends PersistentState {
                 .computeIfAbsent(player, k -> new HashMap<>())
                 .computeIfAbsent(questId, k -> new HashSet<>())
                 .add(chunkPosLong);
-        this.markDirty();
+        this.setDirty();
     }
 
     // 1. Define the Codec
@@ -96,7 +95,6 @@ public class QuestState extends PersistentState {
                     .optionalFieldOf("discovered_structures", new HashMap<>()).forGetter(QuestState::getDiscoveredStructuresMapAsString)
 
     ).apply(instance, QuestState::createFromMaps));
-
 
     // 2. Helper methods to convert UUIDs and Sets to Strings/Lists for the Codec
     private Map<String, Map<String, Integer>> getProgressMapAsString() {
@@ -143,7 +141,7 @@ public class QuestState extends PersistentState {
     }
 
     // 3. Global accessor for server state
-    private static final PersistentStateType<QuestState> TYPE = new PersistentStateType<>(
+    private static final SavedDataType<QuestState> TYPE = new SavedDataType<>(
             "pacpackquests_data", // ID of the save file
             QuestState::new,      // Factory method
             QuestState.CODEC,     // Our custom Codec
@@ -151,6 +149,6 @@ public class QuestState extends PersistentState {
     );
 
     public static QuestState getServerState(MinecraftServer server) {
-        return Objects.requireNonNull(server.getWorld(World.OVERWORLD)).getPersistentStateManager().getOrCreate(TYPE);
+        return Objects.requireNonNull(server.overworld()).getDataStorage().computeIfAbsent(TYPE);
     }
 }

@@ -1,32 +1,34 @@
 package fr.pacdu.pacpackquests.data;
 
-import fr.pacdu.pacpackquests.PacPackQuests;
+import fr.pacdu.pacpackquests.Constants;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.TaskType;
-import net.fabricmc.fabric.api.entity.event.v1.ServerEntityCombatEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
-import net.fabricmc.fabric.api.event.player.UseBlockCallback;
-import net.fabricmc.fabric.api.event.player.UseEntityCallback;
-import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.block.Block;
-import net.minecraft.block.entity.LootableContainerBlockEntity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.loot.LootTable;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.tag.TagKey;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.structure.StructureStart;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-
+import fr.pacdu.pacpackquests.platform.Services;
 import fr.pacdu.pacpackquests.util.ItemUtils;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.vehicle.ContainerEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
+import net.minecraft.world.level.storage.loot.LootTable;
 
 import java.lang.reflect.Method;
 import java.util.UUID;
@@ -35,190 +37,174 @@ public class QuestEventHandler {
 
     private QuestEventHandler() {}
 
-    public static void register() {
-        // Check broken blocks
-        PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
-            if (!world.isClient()) {
-                for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
-                    if (quest.taskType() == TaskType.MINE_BLOCK) {
-                        boolean isTarget;
-                        String target = quest.target();
+    public static void onBlockBreak(ServerPlayer player, BlockState state) {
+        for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
+            if (quest.taskType() == TaskType.MINE_BLOCK) {
+                boolean isTarget;
+                String target = quest.target();
 
-                        if (target.startsWith("#")) {
-                            Identifier id = Identifier.tryParse(target.substring(1));
-                            if (id == null) continue;
-                            TagKey<Block> tag = TagKey.of(RegistryKeys.BLOCK, id);
-                            isTarget = state.isIn(tag);
-                        } else {
-                            isTarget = Registries.BLOCK.getId(state.getBlock()).toString().equals(target);
-                        }
+                if (target.startsWith("#")) {
+                    Identifier id = Identifier.tryParse(target.substring(1));
+                    if (id == null) continue;
+                    TagKey<Block> tag = TagKey.create(Registries.BLOCK, id);
+                    isTarget = state.is(tag);
+                } else {
+                    isTarget = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString().equals(target);
+                }
 
-                        if (isTarget) {
-                            QuestProgressHandler.incrementProgress((ServerPlayerEntity) player, quest, 1);
-                        }
-                    }
+                if (isTarget) {
+                    QuestProgressHandler.incrementProgress(player, quest, 1);
                 }
             }
-        });
+        }
+    }
 
-        // Check killed entities
-        ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.register((world, entity, killedEntity, damageSource) -> {
-            if (entity instanceof ServerPlayerEntity player) {
-                for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
-                    if (quest.taskType() == TaskType.KILL_MOB) {
-                        boolean isTarget;
-                        String target = quest.target();
+    public static void onEntityKill(ServerPlayer player, Entity killedEntity) {
+        for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
+            if (quest.taskType() == TaskType.KILL_MOB) {
+                boolean isTarget;
+                String target = quest.target();
 
-                        if (target.startsWith("#")) {
-                            Identifier id = Identifier.tryParse(target.substring(1));
-                            if (id == null) continue;
-                            TagKey<EntityType<?>> tag = TagKey.of(RegistryKeys.ENTITY_TYPE, id);
-                            isTarget = killedEntity.getType().isIn(tag);
-                        } else {
-                            isTarget = Registries.ENTITY_TYPE.getId(killedEntity.getType()).toString().equals(target);
-                        }
+                if (target.startsWith("#")) {
+                    Identifier id = Identifier.tryParse(target.substring(1));
+                    if (id == null) continue;
+                    TagKey<EntityType<?>> tag = TagKey.create(Registries.ENTITY_TYPE, id);
+                    isTarget = killedEntity.getType().is(tag);
+                } else {
+                    isTarget = BuiltInRegistries.ENTITY_TYPE.getKey(killedEntity.getType()).toString().equals(target);
+                }
 
-                        if (isTarget) {
-                            QuestProgressHandler.incrementProgress(player, quest, 1);
-                        }
-                    }
+                if (isTarget) {
+                    QuestProgressHandler.incrementProgress(player, quest, 1);
                 }
             }
-        });
+        }
+    }
 
-        // Check opened chests
-        UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
-            if (!world.isClient() && hand == Hand.MAIN_HAND) {
-                net.minecraft.block.entity.BlockEntity be = world.getBlockEntity(hitResult.getBlockPos());
-                if (be instanceof LootableContainerBlockEntity lootable) {
-                    var lootKey = lootable.getLootTable();
-                    computeOpenedChest(lootKey, player, be);
-                }
-            }
-            return ActionResult.PASS;
-        });
+    public static void onUseBlock(ServerPlayer player, Level world, BlockPos pos) {
+        BlockEntity be = world.getBlockEntity(pos);
+        if (be instanceof RandomizableContainerBlockEntity lootable) {
+            ResourceKey<LootTable> lootKey = lootable.getLootTable();
+            computeOpenedChest(lootKey, player, be);
+        }
+    }
 
-        // Check opened minecarts
-        UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
-            if (!world.isClient() && hand == Hand.MAIN_HAND && hitResult != null) {
-                if (entity instanceof net.minecraft.entity.vehicle.VehicleInventory vehicle) {
-                    var lootKey = vehicle.getLootTable();
-                    computeOpenedChest(lootKey, player, entity);
-                }
-            }
-            return ActionResult.PASS;
-        });
+    public static void onUseEntity(ServerPlayer player, Level world, Entity entity) {
+        if (entity instanceof ContainerEntity vehicle) {
+            ResourceKey<LootTable> lootKey = vehicle.getContainerLootTable();
+            computeOpenedChest(lootKey, player, entity);
+        }
+    }
 
-        // Check biome, structure, dimension, and inventory
-        ServerTickEvents.END_SERVER_TICK.register(server -> {
-            if (server.getTicks() % 5 != 0) return;
+    public static void onServerTick(MinecraftServer server) {
+        if (server.getTickCount() % 5 != 0) return;
 
-            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-                BlockPos pos = player.getBlockPos();
-                var world = player.getEntityWorld();
-                var registryManager = world.getRegistryManager();
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            BlockPos pos = player.blockPosition();
+            ServerLevel world = player.level();
+            HolderLookup.Provider registryManager = world.registryAccess();
 
-                for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
-                    boolean requirementMet = false;
-                    String target = quest.target();
+            for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
+                boolean requirementMet = false;
+                String target = quest.target();
 
-                    if (quest.taskType() == TaskType.OBTAIN_ITEM) {
-                        int targetItemCount = 0;
-                        for (int i = 0; i < player.getInventory().size(); i++) {
-                            ItemStack stack = player.getInventory().getStack(i);
-                            if (!stack.isEmpty()) {
-                                if (ItemUtils.matches(stack, target, registryManager)) {
-                                    targetItemCount += stack.getCount();
-                                }
+                if (quest.taskType() == TaskType.OBTAIN_ITEM) {
+                    int targetItemCount = 0;
+                    for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+                        ItemStack stack = player.getInventory().getItem(i);
+                        if (!stack.isEmpty()) {
+                            if (ItemUtils.matches(stack, target, registryManager)) {
+                                targetItemCount += stack.getCount();
                             }
                         }
-                        if (targetItemCount > 0) {
-                            QuestProgressHandler.setProgress(player, quest, targetItemCount);
-                        }
-                        continue;
                     }
+                    if (targetItemCount > 0) {
+                        QuestProgressHandler.setProgress(player, quest, targetItemCount);
+                    }
+                    continue;
+                }
 
-                    boolean isTag = target.startsWith("#");
-                    Identifier targetId = Identifier.tryParse(isTag ? target.substring(1) : target);
+                boolean isTag = target.startsWith("#");
+                Identifier targetId = Identifier.tryParse(isTag ? target.substring(1) : target);
 
-                    if (targetId == null) continue;
+                if (targetId == null) continue;
 
-                    switch (quest.taskType()) {
-                        case EXPLORE_DIMENSION -> {
-                            if (world.getRegistryKey().getValue().equals(targetId)) {
+                switch (quest.taskType()) {
+                    case EXPLORE_DIMENSION -> {
+                        if (world.dimension().identifier().equals(targetId)) {
+                            requirementMet = true;
+                        }
+                    }
+                    case EXPLORE_BIOME -> {
+                        Holder<Biome> biomeEntry = world.getBiome(pos);
+                        if (isTag) {
+                            if (biomeEntry.is(TagKey.create(Registries.BIOME, targetId))) requirementMet = true;
+                        } else {
+                            if (biomeEntry.is(targetId)) requirementMet = true;
+                        }
+                    }
+                    case EXPLORE_STRUCTURE -> {
+                        var structureRegistry = registryManager.lookup(Registries.STRUCTURE);
+                        StructureStart structureStart = null;
+
+                        if (isTag) {
+                            TagKey<Structure> tag = TagKey.create(Registries.STRUCTURE, targetId);
+                            structureStart = world.structureManager().getStructureWithPieceAt(pos, tag);
+                        } else if (structureRegistry.isPresent()) {
+                            var structureHolder = structureRegistry.get().get(ResourceKey.create(Registries.STRUCTURE, targetId));
+                            if (structureHolder.isPresent()) {
+                                structureStart = world.structureManager().getStructureWithPieceAt(pos, structureHolder.get().value());
+                            }
+                        }
+
+                        if (structureStart != null && structureStart.isValid()) {
+                            long structureUniqueId = structureStart.getChunkPos().toLong();
+                            QuestState state = QuestState.getServerState(server);
+                            UUID playerUuid = player.getUUID();
+
+                            if (!state.hasDiscoveredStructure(playerUuid, quest.id(), structureUniqueId)) {
+                                state.addDiscoveredStructure(playerUuid, quest.id(), structureUniqueId);
                                 requirementMet = true;
                             }
                         }
-                        case EXPLORE_BIOME -> {
-                            var biomeEntry = world.getBiome(pos);
-                            if (isTag) {
-                                if (biomeEntry.isIn(TagKey.of(RegistryKeys.BIOME, targetId))) requirementMet = true;
-                            } else {
-                                if (biomeEntry.matchesId(targetId)) requirementMet = true;
-                            }
-                        }
-                        case EXPLORE_STRUCTURE -> {
-                            var structureRegistry = registryManager.getOrThrow(RegistryKeys.STRUCTURE);
-                            StructureStart structureStart = null;
-
-                            if (isTag) {
-                                TagKey<net.minecraft.world.gen.structure.Structure> tag = TagKey.of(RegistryKeys.STRUCTURE, targetId);
-                                structureStart = world.getStructureAccessor().getStructureContaining(pos, tag);
-                            } else {
-                                var structure = structureRegistry.get(targetId);
-                                if (structure != null) {
-                                    structureStart = world.getStructureAccessor().getStructureContaining(pos, structure);
-                                }
-                            }
-
-                            if (structureStart != null && structureStart.hasChildren()) {
-                                long structureUniqueId = structureStart.getPos().toLong();
-                                QuestState state = QuestState.getServerState(server);
-                                UUID playerUuid = player.getUuid();
-
-                                if (!state.hasDiscoveredStructure(playerUuid, quest.id(), structureUniqueId)) {
-                                    state.addDiscoveredStructure(playerUuid, quest.id(), structureUniqueId);
-                                    requirementMet = true;
-                                }
-                            }
-                        }
                     }
+                    default -> {}
+                }
 
-                    if (requirementMet) {
-                        QuestProgressHandler.incrementProgress(player, quest, 1);
-                    }
+                if (requirementMet) {
+                    QuestProgressHandler.incrementProgress(player, quest, 1);
                 }
             }
-        });
+        }
     }
 
-    private static void computeOpenedChest(RegistryKey<LootTable> lootKey, PlayerEntity player, Object entity) {
+    private static void computeOpenedChest(ResourceKey<LootTable> lootKey, ServerPlayer player, Object entity) {
         if (lootKey != null) {
-            Identifier lootTableId = lootKey.getValue();
+            Identifier lootTableId = lootKey.identifier();
             for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
                 if (quest.taskType() == TaskType.OPEN_LOOT_CHEST) {
                     String target = quest.target();
-                    if (checkLootrStatus((ServerPlayerEntity) player, entity) && (target.equals("#pacpackquests:loot_chest") || target.equals(lootTableId.toString()))) {
-                        QuestProgressHandler.incrementProgress((ServerPlayerEntity) player, quest, 1);
+                    if (checkLootrStatus(player, entity) && (target.equals("#pacpackquests:loot_chest") || target.equals(lootTableId.toString()))) {
+                        QuestProgressHandler.incrementProgress(player, quest, 1);
                     }
                 }
             }
         }
     }
 
-    private static boolean checkLootrStatus(ServerPlayerEntity player, Object target) {
-        if (!FabricLoader.getInstance().isModLoaded("lootr")) {
+    private static boolean checkLootrStatus(ServerPlayer player, Object target) {
+        if (!Services.PLATFORM.isModLoaded("lootr")) {
             return true;
         }
         try {
             Class<?> infoClass = Class.forName("noobanidus.mods.lootr.common.api.data.ILootrInfoProvider");
             if (infoClass.isInstance(target)) {
                 Method hasOpened = infoClass.getMethod("hasOpened", UUID.class);
-                boolean opened = (boolean) hasOpened.invoke(target, player.getUuid());
+                boolean opened = (boolean) hasOpened.invoke(target, player.getUUID());
                 return !opened;
             }
         } catch (Exception e) {
-            PacPackQuests.LOGGER.warn("You are using an outdated or incompatible version of Lootr! Loot chest quests may be exploitable.");
+            Constants.LOG.warn("You are using an outdated or incompatible version of Lootr! Loot chest quests may be exploitable.");
         }
         return true;
     }

@@ -1,9 +1,9 @@
 package fr.pacdu.pacpackquests.config;
 
 import com.google.gson.*;
-import fr.pacdu.pacpackquests.PacPackQuests;
+import fr.pacdu.pacpackquests.Constants;
+import fr.pacdu.pacpackquests.platform.Services;
 import fr.pacdu.pacpackquests.util.PathSecurity;
-import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.Reader;
 import java.io.Writer;
@@ -12,11 +12,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-import static fr.pacdu.pacpackquests.PacPackQuests.DEFAULT_CATEGORY_NAME;
+import static fr.pacdu.pacpackquests.Constants.DEFAULT_CATEGORY_NAME;
 
 public class ModConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path CONFIG_FILE = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/categories.json");
+    private static final Path CONFIG_FILE = Services.PLATFORM.getConfigDirectory().resolve("pacpackquests/categories.json");
 
     public static List<String> categoryOrder = new ArrayList<>();
     public static int maxGridColumns = 20;
@@ -44,7 +44,7 @@ public class ModConfig {
                 save();
             }
         } catch (Exception e) {
-            PacPackQuests.LOGGER.error("Failed to load categories config.", e);
+            Constants.LOG.error("Failed to load categories config.", e);
         }
     }
 
@@ -59,7 +59,7 @@ public class ModConfig {
                 GSON.toJson(json, writer);
             }
         } catch (Exception e) {
-            PacPackQuests.LOGGER.error("Failed to save categories config.", e);
+            Constants.LOG.error("Failed to save categories config.", e);
         }
     }
 }

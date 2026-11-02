@@ -1,23 +1,24 @@
 package fr.pacdu.pacpackquests.client.screen;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
-import fr.pacdu.pacpackquests.client.PacPackQuestsClient;
+import fr.pacdu.pacpackquests.client.ClientQuestData;
 import fr.pacdu.pacpackquests.client.util.DrawUtils;
 import fr.pacdu.pacpackquests.util.ItemUtils;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.HashSet;
 
-import static fr.pacdu.pacpackquests.client.PacPackQuestsClient.CLIENT_DEFINITIONS;
+import static fr.pacdu.pacpackquests.client.ClientQuestData.CLIENT_DEFINITIONS;
 
 public class ParentSelectionScreen extends AbstractQuestGridScreen {
 
@@ -43,7 +44,7 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
     private final String tempIcon;
 
     public ParentSelectionScreen(EditQuestScreen parentScreen, String questId, String currentCategory, List<String> initialParents, String tempTitle, int tempX, int tempY, String tempIcon) {
-        super(Text.translatable("gui.pacpackquests.select_parents"));
+        super(Component.translatable("gui.pacpackquests.select_parents"));
         this.parentScreen = parentScreen;
         this.questId = questId;
         this.currentCategory = currentCategory;
@@ -72,10 +73,10 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
         if (!foundSelf && this.questId != null) {
             int nodeX = canvasOffsetX + (this.tempX * gridSpacing) + 8;
             int nodeY = canvasOffsetY + (this.tempY * gridSpacing) + 8;
-            ItemStack iconStack = Items.STONE.getDefaultStack();
+            ItemStack iconStack = Items.STONE.getDefaultInstance();
             if (this.tempIcon != null) {
-                var world = MinecraftClient.getInstance().world;
-                var reg = world != null ? world.getRegistryManager() : null;
+                var world = Minecraft.getInstance().level;
+                var reg = world != null ? world.registryAccess() : null;
                 ItemStack parsed = ItemUtils.fromCommandString(this.tempIcon, reg);
                 if (!parsed.isEmpty()) {
                     iconStack = parsed;
@@ -88,12 +89,12 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
         int buttonHeight = 20;
 
         // "Done" Button positioned exactly where "Claim All" button is in QuestScreen for symmetry
-        this.addDrawableChild(
-            ButtonWidget.builder(Text.translatable("gui.done"), button -> {
+        this.addRenderableWidget(
+            Button.builder(Component.translatable("gui.done"), button -> {
                 this.parentScreen.updateParents(this.selectedParents);
-                this.client.setScreen(this.parentScreen);
+                this.minecraft.setScreen(this.parentScreen);
             })
-            .dimensions((this.width / 2) - buttonWidth / 2, this.height - 35, buttonWidth, buttonHeight)
+            .bounds((this.width / 2) - buttonWidth / 2, this.height - 35, buttonWidth, buttonHeight)
             .build()
         );
 
@@ -128,7 +129,7 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+    public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
         if (click.button() == 0) {
             double mouseX = click.x(); double mouseY = click.y(); double localMouseX = (mouseX - startX - panX) / zoom;
             double localMouseY = (mouseY - startY - panY) / zoom;
@@ -154,11 +155,11 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
 
         // Share the background framing logic with QuestScreen
-        drawBackgroundFrame(context, Text.translatable("gui.pacpackquests.select_parents"));
+        drawBackgroundFrame(context, Component.translatable("gui.pacpackquests.select_parents"));
         
         // Category tab logic
         int tabX = startX - tabWidth;
@@ -169,17 +170,17 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
         int maxTextWidth = tabWidth - 8;
         String displayCat = fullCat;
         boolean isTruncated = false;
-        if (this.textRenderer.getWidth(fullCat) > maxTextWidth) {
-            int ellipsisWidth = this.textRenderer.getWidth("...");
-            displayCat = this.textRenderer.trimToWidth(fullCat, maxTextWidth - ellipsisWidth) + "...";
+        if (this.font.width(fullCat) > maxTextWidth) {
+            int ellipsisWidth = this.font.width("...");
+            displayCat = this.font.plainSubstrByWidth(fullCat, maxTextWidth - ellipsisWidth) + "...";
             isTruncated = true;
         }
-        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(displayCat), tabX + tabWidth / 2, tabY + 6, 0xFFFFFFFF);
+        context.drawCenteredString(this.font, Component.literal(displayCat), tabX + tabWidth / 2, tabY + 6, 0xFFFFFFFF);
 
         context.enableScissor(startX, startY, startX + windowWidth, startY + windowHeight);
-        context.getMatrices().pushMatrix();
-        context.getMatrices().translate((float) (startX + panX), (float) (startY + panY));
-        context.getMatrices().scale(zoom, zoom);
+        context.pose().pushMatrix();
+        context.pose().translate((float) (startX + panX), (float) (startY + panY));
+        context.pose().scale(zoom, zoom);
 
         // Draw connections between nodes using the abstract class logic
         for (SelectionNode node : nodes) {
@@ -217,26 +218,26 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
             }
         }
 
-        context.getMatrices().popMatrix();
+        context.pose().popMatrix();
         context.disableScissor();
 
         // Tooltip for hovering
         if (hoveredNode != null) {
-            List<Text> tooltip = new ArrayList<>();
-            tooltip.add(Text.literal(hoveredNode.title()).formatted(Formatting.GOLD, Formatting.BOLD));
-            tooltip.add(Text.literal(hoveredNode.id()).formatted(Formatting.GRAY));
+            List<Component> tooltip = new ArrayList<>();
+            tooltip.add(Component.literal(hoveredNode.title()).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+            tooltip.add(Component.literal(hoveredNode.id()).withStyle(ChatFormatting.GRAY));
             if (hoveredNode.id().equals(questId)) {
-                tooltip.add(Text.translatable("gui.pacpackquests.cannot_select_self").formatted(Formatting.RED));
+                tooltip.add(Component.translatable("gui.pacpackquests.cannot_select_self").withStyle(ChatFormatting.RED));
             } else if (this.invalidDescendants.contains(hoveredNode.id())) {
-                tooltip.add(Text.translatable("gui.pacpackquests.cannot_select_child").formatted(Formatting.RED));
+                tooltip.add(Component.translatable("gui.pacpackquests.cannot_select_child").withStyle(ChatFormatting.RED));
             }
-            context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
+            context.setTooltipForNextFrame(this.font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
         } else if (isTruncated && mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= tabY && mouseY <= tabY + tabHeight) {
-            context.drawTooltip(this.textRenderer, Text.literal(fullCat), mouseX, mouseY);
+            context.setTooltipForNextFrame(this.font, Component.literal(fullCat), mouseX, mouseY);
         }
     }
 
-    private void renderNode(DrawContext context, SelectionNode node, double localMouseX, double localMouseY) { //
+    private void renderNode(GuiGraphics context, SelectionNode node, double localMouseX, double localMouseY) {
         boolean isSelected = selectedParents.contains(node.id());
         boolean isDescendant = this.invalidDescendants.contains(node.id());
         int bgColor = 0xFF555555;
@@ -265,7 +266,7 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
         if (potentialParentId.equals(targetAncestorId)) return true;
         if (!visited.add(potentialParentId)) return false;
 
-        QuestDefinition def = PacPackQuestsClient.CLIENT_DEFINITIONS.get(potentialParentId);
+        QuestDefinition def = ClientQuestData.CLIENT_DEFINITIONS.get(potentialParentId);
         if (def != null && def.parents() != null) {
             for (String parentId : def.parents()) {
                 if (isDescendant(parentId, targetAncestorId, visited)) return true;

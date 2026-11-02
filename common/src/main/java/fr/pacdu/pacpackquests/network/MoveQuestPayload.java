@@ -1,21 +1,23 @@
 package fr.pacdu.pacpackquests.network;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import fr.pacdu.pacpackquests.Constants;
 
-public record MoveQuestPayload(String questId, int newX, int newY) implements CustomPayload {
-    public static final Id<MoveQuestPayload> ID = new Id<>(Identifier.of("pacpackquests", "move_quest"));
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
-    public static final PacketCodec<RegistryByteBuf, MoveQuestPayload> CODEC = PacketCodec.tuple(
-            PacketCodecs.STRING, MoveQuestPayload::questId,
-            PacketCodecs.INTEGER, MoveQuestPayload::newX,
-            PacketCodecs.INTEGER, MoveQuestPayload::newY,
+public record MoveQuestPayload(String questId, int newX, int newY) implements CustomPacketPayload {
+    public static final Type<MoveQuestPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(Constants.MOD_ID, "move_quest"));
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, MoveQuestPayload> CODEC = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, MoveQuestPayload::questId,
+            ByteBufCodecs.VAR_INT, MoveQuestPayload::newX,
+            ByteBufCodecs.VAR_INT, MoveQuestPayload::newY,
             MoveQuestPayload::new
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() { return ID; }
+    public Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

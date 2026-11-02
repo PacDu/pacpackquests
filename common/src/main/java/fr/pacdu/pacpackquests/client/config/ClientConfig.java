@@ -1,9 +1,9 @@
 package fr.pacdu.pacpackquests.client.config;
 
 import com.google.gson.*;
-import fr.pacdu.pacpackquests.PacPackQuests;
+import fr.pacdu.pacpackquests.Constants;
+import fr.pacdu.pacpackquests.platform.Services;
 import fr.pacdu.pacpackquests.util.PathSecurity;
-import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.Reader;
 import java.io.Writer;
@@ -14,7 +14,7 @@ import java.util.Map;
 
 public class ClientConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path CONFIG_FILE = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/client.json");
+    private static final Path CONFIG_FILE = Services.PLATFORM.getConfigDirectory().resolve("pacpackquests/client.json");
 
     public static Map<String, CameraState> cameraPositions = new HashMap<>();
     public record CameraState(double panX, double panY, float zoom) {}
@@ -45,7 +45,7 @@ public class ClientConfig {
                 save();
             }
         } catch (Exception e) {
-            PacPackQuests.LOGGER.error("Failed to load client config.", e);
+            Constants.LOG.error("Failed to load client config.", e);
         }
     }
 
@@ -70,7 +70,7 @@ public class ClientConfig {
                 GSON.toJson(json, writer);
             }
         } catch (Exception e) {
-            PacPackQuests.LOGGER.error("Failed to save client config.", e);
+            Constants.LOG.error("Failed to save client config.", e);
         }
     }
 }

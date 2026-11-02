@@ -1,24 +1,26 @@
 package fr.pacdu.pacpackquests.network;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import fr.pacdu.pacpackquests.Constants;
 
-// A lightweight payload to tell the client "Hey, show the toast for this quest ID!"
-public record QuestCompletedPayload(String questId) implements CustomPayload {
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
-    public static final CustomPayload.Id<QuestCompletedPayload> ID = new CustomPayload.Id<>(Identifier.of("pacpackquests", "quest_completed"));
+// A lightweight payload to tell the client "Hey, show the toast for this quest TYPE!"
+public record QuestCompletedPayload(String questId) implements CustomPacketPayload {
+
+    public static final CustomPacketPayload.Type<QuestCompletedPayload> TYPE = new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath(Constants.MOD_ID, "quest_completed"));
 
     // 1.21 Packet Codec structure
-    public static final PacketCodec<RegistryByteBuf, QuestCompletedPayload> CODEC = PacketCodec.tuple(
-            PacketCodecs.STRING, QuestCompletedPayload::questId,
+    public static final StreamCodec<RegistryFriendlyByteBuf, QuestCompletedPayload> CODEC = StreamCodec.composite(
+            ByteBufCodecs.STRING_UTF8, QuestCompletedPayload::questId,
             QuestCompletedPayload::new
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

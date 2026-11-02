@@ -1,7 +1,7 @@
 package fr.pacdu.pacpackquests.client.gui;
 
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.util.Mth;
 
 public class ScrollbarWidget {
     private int x, y, width, height;
@@ -31,7 +31,7 @@ public class ScrollbarWidget {
     public void setMaxScroll(double maxScroll, double visibleContent) {
         this.visibleContent = visibleContent;
         this.maxScroll = Math.max(0, maxScroll);
-        this.scrollAmount = MathHelper.clamp(this.scrollAmount, 0, this.maxScroll);
+        this.scrollAmount = Mth.clamp(this.scrollAmount, 0, this.maxScroll);
     }
     
     public int getStepOffset() {
@@ -43,14 +43,14 @@ public class ScrollbarWidget {
     }
 
     public void setScrollAmount(double scrollAmount) {
-        this.scrollAmount = MathHelper.clamp(scrollAmount, 0, this.maxScroll);
+        this.scrollAmount = Mth.clamp(scrollAmount, 0, this.maxScroll);
     }
 
     public void resetScroll() {
         this.scrollAmount = 0;
     }
 
-    public void render(DrawContext context, int mouseX, int mouseY) {
+    public void render(GuiGraphics context, int mouseX, int mouseY) {
         if (maxScroll <= 0) return;
         
         context.fill(x, y, x + width, y + height, 0xFF222222);
@@ -68,7 +68,7 @@ public class ScrollbarWidget {
         if (visibleContent <= 0) return 15;
         double ratio = visibleContent / (maxScroll + visibleContent);
         int proportional = (int) (height * ratio);
-        return MathHelper.clamp(proportional, 15, height);
+        return Mth.clamp(proportional, 15, height);
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
@@ -98,11 +98,14 @@ public class ScrollbarWidget {
         return false;
     }
 
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double verticalAmount) {
+        return mouseScrolled(mouseX, mouseY, 0.0, verticalAmount);
+    }
+
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         if (maxScroll > 0) {
-            double scrollDelta = smoothScrolling ? 15.0 : stepSize;
-            this.scrollAmount -= amount * scrollDelta;
-            this.scrollAmount = MathHelper.clamp(this.scrollAmount, 0, this.maxScroll);
+            double delta = -verticalAmount * (smoothScrolling ? 10.0 : stepSize);
+            setScrollAmount(this.scrollAmount + delta);
             return true;
         }
         return false;
@@ -110,13 +113,11 @@ public class ScrollbarWidget {
 
     private void updateScrollFromMouse(double mouseY) {
         int thumbHeight = getThumbHeight();
-        double adjustedY = mouseY - y - (thumbHeight / 2.0);
-        int trackSpace = height - thumbHeight;
-        double ratio = trackSpace > 0 ? adjustedY / trackSpace : 0.0;
-        ratio = MathHelper.clamp(ratio, 0.0, 1.0);
-        this.scrollAmount = ratio * maxScroll;
-        if (!smoothScrolling) {
-            this.scrollAmount = Math.round(this.scrollAmount / stepSize) * stepSize;
+        double trackHeight = height - thumbHeight;
+        if (trackHeight > 0) {
+            double relativeY = mouseY - y - (thumbHeight / 2.0);
+            double progress = relativeY / trackHeight;
+            setScrollAmount(progress * maxScroll);
         }
     }
 }

@@ -3,18 +3,20 @@ package fr.pacdu.pacpackquests.network;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import fr.pacdu.pacpackquests.PacPackQuests;
+import fr.pacdu.pacpackquests.Constants;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.data.QuestManager;
 import fr.pacdu.pacpackquests.data.QuestState;
+import fr.pacdu.pacpackquests.platform.Services;
 import fr.pacdu.pacpackquests.reward.QuestReward;
 import fr.pacdu.pacpackquests.util.PathSecurity;
 import fr.pacdu.pacpackquests.util.RegistryType;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,7 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
-import static fr.pacdu.pacpackquests.PacPackQuests.DEFAULT_CATEGORY_NAME;
+import static fr.pacdu.pacpackquests.Constants.DEFAULT_CATEGORY_NAME;
 
 public class ServerNetworkHandler {
 
@@ -30,282 +32,286 @@ public class ServerNetworkHandler {
 
     private ServerNetworkHandler() {}
 
-    public static void register() {
-        // Claim Quest Reward
-        ServerPlayNetworking.registerGlobalReceiver(ClaimQuestPayload.ID, (payload, context) -> context.server().execute(() -> {
-            QuestState questState = QuestState.getServerState(context.server());
-            ServerPlayerEntity player = context.player();
-            UUID playerId = player.getUuid();
+    private static boolean isOp(ServerPlayer player) {
+        MinecraftServer server = player.level().getServer();
+        return server != null && server.getPlayerList().isOp(player.nameAndId());
+    }
 
-            QuestDefinition quest = QuestManager.LOADED_QUESTS.get(payload.questId());
-            if (quest != null) {
-                int progress = questState.getProgress(playerId, quest.id());
-                boolean claimed = questState.isClaimed(playerId, quest.id());
+    public static void handleClaimQuest(ServerPlayer player, ClaimQuestPayload payload) {
+        MinecraftServer server = player.level().getServer();
+        if (server == null) return;
 
-                if (progress >= quest.requiredAmount() && !claimed) {
-                    if (quest.rewards() != null) {
-                        for (QuestReward reward : quest.rewards()) {
-                            reward.grant(player, context.server().getRegistryManager());
-                        }
+        QuestState questState = QuestState.getServerState(server);
+        UUID playerId = player.getUUID();
+
+        QuestDefinition quest = QuestManager.LOADED_QUESTS.get(payload.questId());
+        if (quest != null) {
+            int progress = questState.getProgress(playerId, quest.id());
+            boolean claimed = questState.isClaimed(playerId, quest.id());
+
+            if (progress >= quest.requiredAmount() && !claimed) {
+                if (quest.rewards() != null) {
+                    for (QuestReward reward : quest.rewards()) {
+                        reward.grant(player, server.registryAccess());
                     }
-                    questState.setClaimed(playerId, quest.id(), true);
-                    ServerPlayNetworking.send(player, new QuestProgressPayload(quest.id(), progress, true, true));
                 }
+                questState.setClaimed(playerId, quest.id(), true);
+                Services.NETWORK.sendToPlayer(player, new QuestProgressPayload(quest.id(), progress, true, true));
             }
-        }));
+        }
+    }
 
-        // Move Quest Node
-        ServerPlayNetworking.registerGlobalReceiver(MoveQuestPayload.ID, (payload, context) -> context.server().execute(() -> {
-            if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
-            if (payload.newX() < 0 || payload.newY() < 0 || payload.newX() >= ModConfig.maxGridColumns || payload.newY() >= ModConfig.maxGridRows) return;
+    public static void handleMoveQuest(ServerPlayer player, MoveQuestPayload payload) {
+        MinecraftServer server = player.level().getServer();
+        if (server == null || !isOp(player)) return;
+        if (payload.newX() < 0 || payload.newY() < 0 || payload.newX() >= ModConfig.maxGridColumns || payload.newY() >= ModConfig.maxGridRows) return;
 
-            QuestDefinition quest = QuestManager.LOADED_QUESTS.get(payload.questId());
-            if (quest == null) return;
+        QuestDefinition quest = QuestManager.LOADED_QUESTS.get(payload.questId());
+        if (quest == null) return;
 
-            Optional<Path> questFileOpt = PathSecurity.getSafeQuestFile(quest.category(), payload.questId());
-            if (questFileOpt.isEmpty()) {
-                PacPackQuests.LOGGER.warn("Blocked unsafe quest move attempt: category={}, id={}", quest.category(), payload.questId());
-                return;
-            }
+        Optional<Path> questFileOpt = PathSecurity.getSafeQuestFile(quest.category(), payload.questId());
+        if (questFileOpt.isEmpty()) {
+            Constants.LOG.warn("Blocked unsafe quest move attempt: category={}, id={}", quest.category(), payload.questId());
+            return;
+        }
 
-            Path questFile = questFileOpt.get();
-            if (Files.exists(questFile)) {
-                try {
-                    JsonObject json = GSON.fromJson(Files.readString(questFile), JsonObject.class);
-                    json.addProperty("displayX", payload.newX());
-                    json.addProperty("displayY", payload.newY());
-                    Files.writeString(questFile, GSON.toJson(json));
-
-                    QuestDefinition newDef = quest.withPosition(payload.newX(), payload.newY());
-                    QuestManager.LOADED_QUESTS.put(payload.questId(), newDef);
-
-                    QuestSyncPayload syncPacket = new QuestSyncPayload(newDef, context.server().getRegistryManager());
-
-                    for (ServerPlayerEntity onlinePlayer : context.server().getPlayerManager().getPlayerList()) {
-                        ServerPlayNetworking.send(onlinePlayer, syncPacket);
-                    }
-                } catch (Exception e) {
-                    PacPackQuests.LOGGER.error("Failed to update quest file!", e);
-                }
-            }
-        }));
-
-        // Save / Edit Quest
-        ServerPlayNetworking.registerGlobalReceiver(SaveQuestPayload.ID, (payload, context) -> context.server().execute(() -> {
-            if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
-
-            QuestDefinition quest = payload.toDefinition(context.server().getRegistryManager());
-
-            if (QuestManager.saveQuest(quest, context.server().getRegistryManager())) {
-                QuestSyncPayload syncPacket = new QuestSyncPayload(quest, context.server().getRegistryManager());
-                context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, syncPacket));
-            }
-        }));
-
-        // Delete Quest
-        ServerPlayNetworking.registerGlobalReceiver(DeleteQuestPayload.ID, (payload, context) -> context.server().execute(() -> {
-            if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
-
-            QuestDefinition def = QuestManager.LOADED_QUESTS.get(payload.questId());
-            if (def != null) {
-                Optional<Path> questFileOpt = PathSecurity.getSafeQuestFile(def.category(), payload.questId());
-                if (questFileOpt.isEmpty()) {
-                    PacPackQuests.LOGGER.warn("Blocked unsafe delete quest attempt: category={}, id={}", def.category(), payload.questId());
-                    return;
-                }
-                Path questFile = questFileOpt.get();
-                try {
-                    Files.deleteIfExists(questFile);
-                    QuestManager.LOADED_QUESTS.remove(payload.questId());
-                    context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, new DeleteQuestPayload(payload.questId())));
-
-                    // Remove it from the parents of quests that has it as a parent
-                    List<QuestDefinition> questsToUpdate = new ArrayList<>();
-                    for (QuestDefinition q : QuestManager.LOADED_QUESTS.values()) {
-                        if (q.parents() != null && q.parents().remove(payload.questId())) {
-                            questsToUpdate.add(q);
-                        }
-                    }
-
-                    // Save updated quests
-                    for (QuestDefinition q : questsToUpdate) {
-                        if (QuestManager.saveQuest(q, context.server().getRegistryManager())) {
-                            QuestSyncPayload syncPacket = new QuestSyncPayload(q, context.server().getRegistryManager());
-                            context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, syncPacket));
-                        }
-                    }
-                } catch (Exception e) {
-                    PacPackQuests.LOGGER.error("Failed to delete quest", e);
-                }
-            }
-        }));
-
-        // Create Category
-        ServerPlayNetworking.registerGlobalReceiver(CreateCategoryPayload.ID, (payload, context) -> context.server().execute(() -> {
-            if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
-
-            Optional<Path> categoryDirOpt = PathSecurity.getSafeCategoryDir(payload.category());
-            if (categoryDirOpt.isEmpty()) {
-                PacPackQuests.LOGGER.warn("Blocked unsafe create category attempt: {}", payload.category());
-                return;
-            }
-            Path categoryDir = categoryDirOpt.get();
+        Path questFile = questFileOpt.get();
+        if (Files.exists(questFile)) {
             try {
-                if (!Files.exists(categoryDir)) {
-                    Files.createDirectories(categoryDir);
-                    if (!ModConfig.categoryOrder.contains(payload.category())) {
-                        ModConfig.categoryOrder.add(payload.category());
-                        ModConfig.save();
-                    }
-                }
-                context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, new CreateCategoryPayload(payload.category())));
+                JsonObject json = GSON.fromJson(Files.readString(questFile), JsonObject.class);
+                json.addProperty("displayX", payload.newX());
+                json.addProperty("displayY", payload.newY());
+                Files.writeString(questFile, GSON.toJson(json));
+
+                QuestDefinition newDef = quest.withPosition(payload.newX(), payload.newY());
+                QuestManager.LOADED_QUESTS.put(payload.questId(), newDef);
+
+                QuestSyncPayload syncPacket = new QuestSyncPayload(newDef, server.registryAccess());
+                Services.NETWORK.sendToAll(server, syncPacket);
             } catch (Exception e) {
-                PacPackQuests.LOGGER.error("Failed to create category folder", e);
+                Constants.LOG.error("Failed to update quest file!", e);
             }
-        }));
+        }
+    }
 
-        // Delete Category
-        ServerPlayNetworking.registerGlobalReceiver(DeleteCategoryPayload.ID, (payload, context) -> context.server().execute(() -> {
-            if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
+    public static void handleSaveQuest(ServerPlayer player, SaveQuestPayload payload) {
+        MinecraftServer server = player.level().getServer();
+        if (server == null || !isOp(player)) return;
 
-            String categoryToDelete = payload.category();
-            Optional<Path> categoryDirOpt = PathSecurity.getSafeCategoryDir(categoryToDelete);
-            if (categoryDirOpt.isEmpty()) {
-                PacPackQuests.LOGGER.warn("Blocked unsafe delete category attempt: {}", categoryToDelete);
-                return;
+        QuestDefinition quest = payload.toDefinition(server.registryAccess());
+
+        if (QuestManager.saveQuest(quest, server.registryAccess())) {
+            QuestSyncPayload syncPacket = new QuestSyncPayload(quest, server.registryAccess());
+            Services.NETWORK.sendToAll(server, syncPacket);
+        }
+    }
+
+    public static void handleDeleteQuest(ServerPlayer player, DeleteQuestPayload payload) {
+        MinecraftServer server = player.level().getServer();
+        if (server == null || !isOp(player)) return;
+
+        QuestDefinition quest = QuestManager.LOADED_QUESTS.get(payload.questId());
+        if (quest == null) return;
+
+        Optional<Path> questFileOpt = PathSecurity.getSafeQuestFile(quest.category(), payload.questId());
+        if (questFileOpt.isEmpty()) {
+            Constants.LOG.warn("Blocked unsafe quest delete attempt: category={}, id={}", quest.category(), payload.questId());
+            return;
+        }
+
+        Path questFile = questFileOpt.get();
+        try {
+            if (Files.deleteIfExists(questFile)) {
+                QuestManager.LOADED_QUESTS.remove(payload.questId());
+                Services.NETWORK.sendToAll(server, new DeleteQuestPayload(payload.questId()));
             }
-            Path categoryDir = categoryDirOpt.get();
+        } catch (Exception e) {
+            Constants.LOG.error("Failed to delete quest file!", e);
+        }
+    }
 
+    public static void handleCreateCategory(ServerPlayer player, CreateCategoryPayload payload) {
+        MinecraftServer server = player.level().getServer();
+        if (server == null || !isOp(player)) return;
+
+        Optional<Path> categoryDirOpt = PathSecurity.getSafeCategoryDir(payload.category());
+        if (categoryDirOpt.isEmpty()) {
+            Constants.LOG.warn("Blocked unsafe create category attempt: category={}", payload.category());
+            return;
+        }
+
+        Path categoryDir = categoryDirOpt.get();
+        try {
+            if (!Files.exists(categoryDir)) {
+                Files.createDirectories(categoryDir);
+                ModConfig.categoryOrder.add(payload.category());
+                ModConfig.save();
+                Services.NETWORK.sendToAll(server, new CreateCategoryPayload(payload.category()));
+            }
+        } catch (Exception e) {
+            Constants.LOG.error("Failed to create category folder!", e);
+        }
+    }
+
+    public static void handleEditCategory(ServerPlayer player, EditCategoryPayload payload) {
+        MinecraftServer server = player.level().getServer();
+        if (server == null || !isOp(player)) return;
+
+        Optional<Path> oldDirOpt = PathSecurity.getSafeCategoryDir(payload.categoryOld());
+        Optional<Path> newDirOpt = PathSecurity.getSafeCategoryDir(payload.categoryNew());
+        if (oldDirOpt.isEmpty() || newDirOpt.isEmpty()) {
+            Constants.LOG.warn("Blocked unsafe edit category attempt: old={}, new={}", payload.categoryOld(), payload.categoryNew());
+            return;
+        }
+
+        Path oldDir = oldDirOpt.get();
+        Path newDir = newDirOpt.get();
+        if (Files.exists(oldDir) && !Files.exists(newDir)) {
             try {
-                File dir = categoryDir.toFile();
-                if (dir.exists() && dir.isDirectory()) {
-                    File[] jsonFiles = dir.listFiles((d, name) -> name.endsWith(".json"));
-                    if (jsonFiles != null) {
-                        for (File file : jsonFiles) {
-                            if (!file.delete()) {
-                                PacPackQuests.LOGGER.warn("Could not delete quest file {}", file);
-                            }
-                        }
-                    }
-                    try (var stream = Files.walk(categoryDir)) {
-                        stream.sorted(Comparator.reverseOrder())
-                                .forEach(path -> {
-                                    try {
-                                        Files.delete(path);
-                                    } catch (IOException e) {
-                                        PacPackQuests.LOGGER.warn("Could not delete file or directory {}: {}", path, e.getMessage());
-                                    }
-                                });
+                Files.move(oldDir, newDir);
+
+                for (QuestDefinition quest : new ArrayList<>(QuestManager.LOADED_QUESTS.values())) {
+                    if (quest.category().equals(payload.categoryOld())) {
+                        QuestDefinition updatedQuest = quest.withCategory(payload.categoryNew());
+                        QuestManager.LOADED_QUESTS.put(quest.id(), updatedQuest);
                     }
                 }
 
-                ModConfig.categoryOrder.remove(categoryToDelete);
-                if (ModConfig.categoryOrder.isEmpty()) ModConfig.categoryOrder.add(DEFAULT_CATEGORY_NAME);
+                int index = ModConfig.categoryOrder.indexOf(payload.categoryOld());
+                if (index != -1) {
+                    ModConfig.categoryOrder.set(index, payload.categoryNew());
+                } else {
+                    ModConfig.categoryOrder.add(payload.categoryNew());
+                }
                 ModConfig.save();
 
-                QuestManager.LOADED_QUESTS.values().removeIf(quest -> quest.category().equals(categoryToDelete));
-                DeleteCategoryPayload syncPayload = new DeleteCategoryPayload(categoryToDelete);
-                context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, syncPayload));
-            } catch (Exception e) {
-                PacPackQuests.LOGGER.error("Failed to delete category folder", e);
+                Services.NETWORK.sendToAll(server, new EditCategoryPayload(payload.categoryOld(), payload.categoryNew()));
+            } catch (IOException e) {
+                Constants.LOG.error("Failed to rename category folder from {} to {}", payload.categoryOld(), payload.categoryNew(), e);
             }
-        }));
+        }
+    }
 
-        // Reorder Categories
-        ServerPlayNetworking.registerGlobalReceiver(ReorderCategoryPayload.ID, (payload, context) -> context.server().execute(() -> {
-            if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
+    public static void handleDeleteCategory(ServerPlayer player, DeleteCategoryPayload payload) {
+        MinecraftServer server = player.level().getServer();
+        if (server == null || !isOp(player)) return;
 
-            List<String> validCategories = payload.categories().stream()
-                    .filter(PathSecurity::isValidIdentifier)
-                    .toList();
+        Optional<Path> categoryDirOpt = PathSecurity.getSafeCategoryDir(payload.category());
+        if (categoryDirOpt.isEmpty()) {
+            Constants.LOG.warn("Blocked unsafe delete category attempt: category={}", payload.category());
+            return;
+        }
 
-            ModConfig.categoryOrder = new ArrayList<>(validCategories);
+        Path categoryDir = categoryDirOpt.get();
+        if (Files.exists(categoryDir)) {
+            File dirFile = categoryDir.toFile();
+            File[] files = dirFile.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isFile() && file.getName().endsWith(".json")) {
+                        String questId = file.getName().substring(0, file.getName().length() - 5);
+                        if (!file.delete()) {
+                            Constants.LOG.warn("Failed to delete quest file \"{}\" while deleting category \"{}\".", file.getName(), payload.category());
+                        } else {
+                            QuestManager.LOADED_QUESTS.remove(questId);
+                        }
+                    }
+                }
+            }
+
+            if (!dirFile.delete()) {
+                Constants.LOG.warn("Failed to delete category folder: {}", categoryDir);
+            }
+
+            ModConfig.categoryOrder.remove(payload.category());
             ModConfig.save();
 
-            ReorderCategoryPayload sanitizedPayload = new ReorderCategoryPayload(validCategories);
-            for (var player : context.server().getPlayerManager().getPlayerList()) {
-                if (player != context.player()) {
-                    ServerPlayNetworking.send(player, sanitizedPayload);
-                }
+            Services.NETWORK.sendToAll(server, new DeleteCategoryPayload(payload.category()));
+        }
+    }
+
+    public static void handleReorderCategory(ServerPlayer player, ReorderCategoryPayload payload) {
+        MinecraftServer server = player.level().getServer();
+        if (server == null || !isOp(player)) return;
+
+        ModConfig.categoryOrder.clear();
+        ModConfig.categoryOrder.addAll(payload.categories());
+        ModConfig.save();
+
+        Services.NETWORK.sendToAll(server, new ReorderCategoryPayload(payload.categories()));
+    }
+
+    public static void handleRequestRegistry(ServerPlayer player, RequestRegistryPayload payload) {
+        MinecraftServer server = player.level().getServer();
+        if (server == null) return;
+
+        List<String> entries = new ArrayList<>();
+
+        if (payload.registryType() == RegistryType.STRUCTURE) {
+            var structureRegistryOpt = server.registryAccess().lookup(Registries.STRUCTURE);
+            if (structureRegistryOpt.isPresent()) {
+                entries = structureRegistryOpt.get().listElementIds()
+                        .map(ResourceKey::identifier)
+                        .map(Identifier::toString)
+                        .sorted()
+                        .toList();
             }
-        }));
-
-        // Request Registry Entries
-        ServerPlayNetworking.registerGlobalReceiver(RequestRegistryPayload.ID, (payload, context) -> context.server().execute(() -> {
-            if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
-
-            List<String> entries = new ArrayList<>();
-            if (payload.type() == RegistryType.STRUCTURE) {
-                var registry = context.server().getRegistryManager().getOrThrow(RegistryKeys.STRUCTURE);
-                registry.getIds().forEach(id -> entries.add(id.toString()));
-                registry.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> entries.add("#" + key.id().toString())));
-            } else if (payload.type() == RegistryType.LOOT_TABLE) {
-                entries.add("#pacpackquests:loot_chest");
-                var opt = context.server().getReloadableRegistries().createRegistryLookup().getOptional(RegistryKeys.LOOT_TABLE);
-                opt.ifPresent(lootTableImpl -> lootTableImpl.streamKeys().forEach(key -> {
-                    Identifier id = key.getValue();
-                    if (id.getPath().startsWith("chests/")) {
-                        entries.add(id.toString());
-                    }
-                }));
+        } else if (payload.registryType() == RegistryType.LOOT_TABLE) {
+            var lookupOpt = server.reloadableRegistries().lookup().lookup(Registries.LOOT_TABLE);
+            if (lookupOpt.isPresent()) {
+                entries = lookupOpt.get().listElementIds()
+                        .map(ResourceKey::identifier)
+                        .filter(id -> id.getPath().startsWith("chests/"))
+                        .map(Identifier::toString)
+                        .sorted()
+                        .toList();
             }
+        }
 
-            if (!entries.isEmpty()) {
-                ServerPlayNetworking.send(context.player(), new SyncRegistryPayload(payload.type(), entries));
+        Services.NETWORK.sendToPlayer(player, new SyncRegistryPayload(payload.registryType(), entries));
+    }
+
+    public static void syncToPlayer(ServerPlayer player) {
+        MinecraftServer server = player.level().getServer();
+        if (server == null) return;
+
+        QuestState questState = QuestState.getServerState(server);
+        UUID playerId = player.getUUID();
+
+        // 1. Send Quest Definitions
+        for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
+            Services.NETWORK.sendToPlayer(player, new QuestSyncPayload(quest, server.registryAccess()));
+        }
+
+        // 2. Send Category Order from server config
+        List<String> orderedCategories = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+
+        for (String cat : ModConfig.categoryOrder) {
+            if (seen.add(cat)) {
+                orderedCategories.add(cat);
             }
-        }));
+        }
 
-        // Edit Category
-        ServerPlayNetworking.registerGlobalReceiver(EditCategoryPayload.ID, (payload, context) -> context.server().execute(() -> {
-            if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
-
-            String categoryOld = payload.categoryOld();
-            String categoryNew = payload.categoryNew();
-
-            if (categoryOld == null || categoryNew == null || categoryOld.equals(categoryNew)) return;
-
-            Optional<Path> categoryDirOldOpt = PathSecurity.getSafeCategoryDir(categoryOld);
-            Optional<Path> categoryDirNewOpt = PathSecurity.getSafeCategoryDir(categoryNew);
-
-            if (categoryDirOldOpt.isEmpty() || categoryDirNewOpt.isEmpty()) {
-                PacPackQuests.LOGGER.warn("Blocked unsafe edit category attempt: old={}, new={}", categoryOld, categoryNew);
-                return;
+        for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
+            if (seen.add(quest.category())) {
+                orderedCategories.add(quest.category());
             }
+        }
 
-            Path categoryDirOld = categoryDirOldOpt.get();
-            Path categoryDirNew = categoryDirNewOpt.get();
+        if (orderedCategories.isEmpty()) {
+            orderedCategories.add(DEFAULT_CATEGORY_NAME);
+        }
 
-            try {
-                File dir = categoryDirOld.toFile();
-                if (dir.exists() && dir.isDirectory()) {
-                    File newDir = categoryDirNew.toFile();
-                    if (!dir.renameTo(newDir)) {
-                        throw new IOException("Failed to rename category dir " + categoryDirOld + " to " + categoryDirNew);
-                    }
-                }
+        Services.NETWORK.sendToPlayer(player, new ReorderCategoryPayload(orderedCategories));
 
-                List<QuestDefinition> questsToUpdate = new ArrayList<>();
-                for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
-                    if (quest.category().equals(categoryOld)) {
-                        questsToUpdate.add(quest);
-                    }
-                }
-                for (QuestDefinition quest : questsToUpdate) {
-                    QuestDefinition updatedQuest = quest.withCategory(categoryNew);
-                    QuestManager.LOADED_QUESTS.put(quest.id(), updatedQuest);
-                }
+        // 3. Send Player Progress
+        for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
+            int progress = questState.getProgress(playerId, quest.id());
+            boolean claimed = questState.isClaimed(playerId, quest.id());
+            boolean isFinished = progress >= quest.requiredAmount();
 
-                int index = ModConfig.categoryOrder.indexOf(categoryOld);
-                if (index != -1) {
-                    ModConfig.categoryOrder.set(index, categoryNew);
-                    ModConfig.save();
-                }
-
-                EditCategoryPayload syncPayload = new EditCategoryPayload(categoryOld, categoryNew);
-                context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, syncPayload));
-            } catch (Exception e) {
-                PacPackQuests.LOGGER.error("Failed to edit category folder", e);
-            }
-        }));
+            Services.NETWORK.sendToPlayer(player, new QuestProgressPayload(quest.id(), progress, isFinished, claimed));
+        }
     }
 }

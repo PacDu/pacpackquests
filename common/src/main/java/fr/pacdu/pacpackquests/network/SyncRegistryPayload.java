@@ -1,32 +1,34 @@
 package fr.pacdu.pacpackquests.network;
 
+import fr.pacdu.pacpackquests.Constants;
+
 import fr.pacdu.pacpackquests.util.RegistryType;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public record SyncRegistryPayload(RegistryType type, List<String> entries) implements CustomPayload {
+public record SyncRegistryPayload(RegistryType registryType, List<String> entries) implements CustomPacketPayload {
 
-    public static final Id<SyncRegistryPayload> ID = new Id<>(Identifier.of("pacpackquests", "sync_registry"));
+    public static final Type<SyncRegistryPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(Constants.MOD_ID, "sync_registry"));
 
-    public static final PacketCodec<RegistryByteBuf, SyncRegistryPayload> CODEC = PacketCodec.of(
-            (value, buf) -> {
-                buf.writeEnumConstant(value.type());
-                buf.writeCollection(value.entries(), PacketByteBuf::writeString);
+    public static final StreamCodec<RegistryFriendlyByteBuf, SyncRegistryPayload> CODEC = StreamCodec.of(
+            (buf, value) -> {
+                buf.writeEnum(value.registryType());
+                buf.writeCollection(value.entries(), FriendlyByteBuf::writeUtf);
             },
             buf -> new SyncRegistryPayload(
-                    buf.readEnumConstant(RegistryType.class),
-                    buf.readCollection(ArrayList::new, PacketByteBuf::readString)
+                    buf.readEnum(RegistryType.class),
+                    buf.readCollection(ArrayList::new, FriendlyByteBuf::readUtf)
             )
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

@@ -1,20 +1,20 @@
 package fr.pacdu.pacpackquests.data;
 
 import com.google.gson.*;
-import fr.pacdu.pacpackquests.PacPackQuests;
+import fr.pacdu.pacpackquests.Constants;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.QuestTask;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
+import fr.pacdu.pacpackquests.platform.Services;
 import fr.pacdu.pacpackquests.reward.*;
 import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.PathSecurity;
-import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.ItemStack;
 
 import java.io.InputStreamReader;
 import java.nio.file.Files;
@@ -35,18 +35,18 @@ public class QuestManager {
     );
 
     public static void loadQuests(MinecraftServer server) {
-        loadQuests(server != null ? server.getRegistryManager() : null);
+        loadQuests(server != null ? server.registryAccess() : null);
     }
 
-    public static void loadQuests(RegistryWrapper.WrapperLookup registries) {
+    public static void loadQuests(HolderLookup.Provider registries) {
         LOADED_QUESTS.clear();
-        Path configDir = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests");
+        Path configDir = Services.PLATFORM.getConfigDirectory().resolve("pacpackquests/quests");
 
         if (!Files.exists(configDir)) {
             try {
                 Files.createDirectories(configDir);
             } catch (Exception e) {
-                PacPackQuests.LOGGER.error("Failed to create quests directory.", e);
+                Constants.LOG.error("Failed to create quests directory.", e);
             }
             return;
         }
@@ -63,21 +63,21 @@ public class QuestManager {
 
                             assertParseAndAddQuest(pathStr, json, registries);
                         } catch (Exception e) {
-                            PacPackQuests.LOGGER.error("Failed to load config quest: {}", path.getFileName(), e);
+                            Constants.LOG.error("Failed to load config quest: {}", path.getFileName(), e);
                         }
                     });
         } catch (Exception e) {
-            PacPackQuests.LOGGER.error("Unable to read the configuration directory.", e);
+            Constants.LOG.error("Unable to read the configuration directory.", e);
         }
 
-        PacPackQuests.LOGGER.info("Successfully loaded {} quests!", LOADED_QUESTS.size());
+        Constants.LOG.info("Successfully loaded {} quests!", LOADED_QUESTS.size());
     }
 
-    public static boolean saveQuest(QuestDefinition quest, RegistryWrapper.WrapperLookup registries) {
+    public static boolean saveQuest(QuestDefinition quest, HolderLookup.Provider registries) {
         Optional<Path> categoryDirOpt = PathSecurity.getSafeCategoryDir(quest.category());
         Optional<Path> questFileOpt = PathSecurity.getSafeQuestFile(quest.category(), quest.id());
         if (categoryDirOpt.isEmpty() || questFileOpt.isEmpty()) {
-            PacPackQuests.LOGGER.warn("Blocked unsafe save quest attempt: category={}, id={}", quest.category(), quest.id());
+            Constants.LOG.warn("Blocked unsafe save quest attempt: category={}, id={}", quest.category(), quest.id());
             return false;
         }
 
@@ -139,12 +139,12 @@ public class QuestManager {
             Files.writeString(questFile, GSON.toJson(json));
             QuestManager.LOADED_QUESTS.put(quest.id(), quest);
         } catch (Exception e) {
-            PacPackQuests.LOGGER.error("Failed to save quest", e);
+            Constants.LOG.error("Failed to save quest", e);
         }
         return true;
     }
 
-    private static void assertParseAndAddQuest(String filePath, JsonObject json, RegistryWrapper.WrapperLookup registries) {
+    private static void assertParseAndAddQuest(String filePath, JsonObject json, HolderLookup.Provider registries) {
         int lastSlash = filePath.lastIndexOf('/');
         String questId = filePath.substring(lastSlash + 1, filePath.length() - 5);
 
@@ -154,7 +154,7 @@ public class QuestManager {
         for (String e : QUEST_DEFINITION_REQUIRED_LIST) {
             if (!json.has(e)) {
                 errorMessage.append("Variable \"").append(e).append("\" is missing in the quest ").append(questId).append(".");
-                PacPackQuests.LOGGER.warn(errorMessage.toString());
+                Constants.LOG.warn(errorMessage.toString());
                 return;
             }
         }
@@ -179,7 +179,7 @@ public class QuestManager {
                 if (!element.getAsString().equals(questId))
                     parents.add(element.getAsString());
                 else
-                    PacPackQuests.LOGGER.warn("Error in the quest \"{}\" : a quest can't have itself as parent", questId);
+                    Constants.LOG.warn("Error in the quest \"{}\" : a quest can't have itself as parent", questId);
             }
         }
 
@@ -245,7 +245,7 @@ public class QuestManager {
                                 if (tagId == null) errorMessage.append(" The reward tag ").append(target).append(" is invalid,");
                             } else {
                                 Identifier rewardId = Identifier.tryParse(rawReward);
-                                if (rewardId == null || !Registries.ITEM.containsId(rewardId)) {
+                                if (rewardId == null || !BuiltInRegistries.ITEM.containsKey(rewardId)) {
                                     errorMessage.append(" The reward ").append(target).append(" does not exist,");
                                 }
                             }
@@ -268,7 +268,7 @@ public class QuestManager {
 
         if (!errorMessage.isEmpty()) {
             errorMessage.deleteCharAt(0).insert(0, "There are errors in the json file of quest \"" + questId + "\" : ").deleteCharAt(errorMessage.length() - 1);
-            PacPackQuests.LOGGER.warn(errorMessage.toString());
+            Constants.LOG.warn(errorMessage.toString());
             return;
         }
 

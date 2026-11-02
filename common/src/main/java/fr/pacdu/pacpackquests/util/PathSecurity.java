@@ -1,6 +1,6 @@
 package fr.pacdu.pacpackquests.util;
 
-import net.fabricmc.loader.api.FabricLoader;
+import fr.pacdu.pacpackquests.platform.Services;
 
 import java.nio.file.Path;
 import java.text.Normalizer;
@@ -39,7 +39,7 @@ public final class PathSecurity {
      * Returns the absolute, normalized root directory for quests.
      */
     public static Path getQuestsRootDir() {
-        return FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests").toAbsolutePath().normalize();
+        return Services.PLATFORM.getConfigDirectory().resolve("pacpackquests/quests").toAbsolutePath().normalize();
     }
 
     /**

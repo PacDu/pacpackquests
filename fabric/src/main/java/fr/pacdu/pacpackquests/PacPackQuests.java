@@ -1,80 +1,81 @@
 package fr.pacdu.pacpackquests;
 
 import fr.pacdu.pacpackquests.config.ModConfig;
-import fr.pacdu.pacpackquests.data.QuestEventHandler;
 import fr.pacdu.pacpackquests.data.QuestManager;
-import fr.pacdu.pacpackquests.data.QuestState;
+import fr.pacdu.pacpackquests.event.FabricQuestEventHandler;
 import fr.pacdu.pacpackquests.network.*;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.server.network.ServerPlayerEntity;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.UUID;
 
 public class PacPackQuests implements ModInitializer {
 
-	public static final String MOD_ID = "pacpackquests";
-	public static final String DEFAULT_CATEGORY_NAME = "main";
-	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-
 	@Override
 	public void onInitialize() {
-		LOGGER.info("Initializing PacPack Quests...");
+		Constants.LOG.info("Initializing PacPack Quests (Fabric)...");
+
 		ModConfig.load();
 		ServerLifecycleEvents.SERVER_STARTING.register(QuestManager::loadQuests);
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> ModConfig.save());
 
 		// Register S2C payloads
-		PayloadTypeRegistry.playS2C().register(QuestSyncPayload.ID, QuestSyncPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(QuestProgressPayload.ID, QuestProgressPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(DeleteQuestPayload.ID, DeleteQuestPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(CreateCategoryPayload.ID, CreateCategoryPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(DeleteCategoryPayload.ID, DeleteCategoryPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(ReorderCategoryPayload.ID, ReorderCategoryPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(EditCategoryPayload.ID, EditCategoryPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(QuestCompletedPayload.ID, QuestCompletedPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(SyncRegistryPayload.ID, SyncRegistryPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(QuestSyncPayload.TYPE, QuestSyncPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(QuestProgressPayload.TYPE, QuestProgressPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(DeleteQuestPayload.TYPE, DeleteQuestPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(CreateCategoryPayload.TYPE, CreateCategoryPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(DeleteCategoryPayload.TYPE, DeleteCategoryPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(ReorderCategoryPayload.TYPE, ReorderCategoryPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(EditCategoryPayload.TYPE, EditCategoryPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(QuestCompletedPayload.TYPE, QuestCompletedPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(SyncRegistryPayload.TYPE, SyncRegistryPayload.CODEC);
 
 		// Register C2S payloads
-		PayloadTypeRegistry.playC2S().register(ClaimQuestPayload.ID, ClaimQuestPayload.CODEC);
-		PayloadTypeRegistry.playC2S().register(MoveQuestPayload.ID, MoveQuestPayload.CODEC);
-		PayloadTypeRegistry.playC2S().register(SaveQuestPayload.ID, SaveQuestPayload.CODEC);
-		PayloadTypeRegistry.playC2S().register(DeleteQuestPayload.ID, DeleteQuestPayload.CODEC);
-		PayloadTypeRegistry.playC2S().register(CreateCategoryPayload.ID, CreateCategoryPayload.CODEC);
-		PayloadTypeRegistry.playC2S().register(DeleteCategoryPayload.ID, DeleteCategoryPayload.CODEC);
-		PayloadTypeRegistry.playC2S().register(ReorderCategoryPayload.ID, ReorderCategoryPayload.CODEC);
-		PayloadTypeRegistry.playC2S().register(EditCategoryPayload.ID, EditCategoryPayload.CODEC);
-		PayloadTypeRegistry.playC2S().register(RequestRegistryPayload.ID, RequestRegistryPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(ClaimQuestPayload.TYPE, ClaimQuestPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(MoveQuestPayload.TYPE, MoveQuestPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(SaveQuestPayload.TYPE, SaveQuestPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(DeleteQuestPayload.TYPE, DeleteQuestPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(CreateCategoryPayload.TYPE, CreateCategoryPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(DeleteCategoryPayload.TYPE, DeleteCategoryPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(ReorderCategoryPayload.TYPE, ReorderCategoryPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(EditCategoryPayload.TYPE, EditCategoryPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(RequestRegistryPayload.TYPE, RequestRegistryPayload.CODEC);
 
-		// Connection Event: Sync all quests progress when a player joins
+		// Register C2S Server Packet Receivers
+		ServerPlayNetworking.registerGlobalReceiver(ClaimQuestPayload.TYPE, (payload, context) ->
+				context.server().execute(() -> ServerNetworkHandler.handleClaimQuest(context.player(), payload)));
+
+		ServerPlayNetworking.registerGlobalReceiver(MoveQuestPayload.TYPE, (payload, context) ->
+				context.server().execute(() -> ServerNetworkHandler.handleMoveQuest(context.player(), payload)));
+
+		ServerPlayNetworking.registerGlobalReceiver(SaveQuestPayload.TYPE, (payload, context) ->
+				context.server().execute(() -> ServerNetworkHandler.handleSaveQuest(context.player(), payload)));
+
+		ServerPlayNetworking.registerGlobalReceiver(DeleteQuestPayload.TYPE, (payload, context) ->
+				context.server().execute(() -> ServerNetworkHandler.handleDeleteQuest(context.player(), payload)));
+
+		ServerPlayNetworking.registerGlobalReceiver(CreateCategoryPayload.TYPE, (payload, context) ->
+				context.server().execute(() -> ServerNetworkHandler.handleCreateCategory(context.player(), payload)));
+
+		ServerPlayNetworking.registerGlobalReceiver(DeleteCategoryPayload.TYPE, (payload, context) ->
+				context.server().execute(() -> ServerNetworkHandler.handleDeleteCategory(context.player(), payload)));
+
+		ServerPlayNetworking.registerGlobalReceiver(ReorderCategoryPayload.TYPE, (payload, context) ->
+				context.server().execute(() -> ServerNetworkHandler.handleReorderCategory(context.player(), payload)));
+
+		ServerPlayNetworking.registerGlobalReceiver(EditCategoryPayload.TYPE, (payload, context) ->
+				context.server().execute(() -> ServerNetworkHandler.handleEditCategory(context.player(), payload)));
+
+		ServerPlayNetworking.registerGlobalReceiver(RequestRegistryPayload.TYPE, (payload, context) ->
+				context.server().execute(() -> ServerNetworkHandler.handleRequestRegistry(context.player(), payload)));
+
+		// Connection Event: Sync all quests and category order when a player joins
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-			ServerPlayerEntity player = handler.player;
-
-			// Sync category order from the server config
-			ServerPlayNetworking.send(player, new ReorderCategoryPayload(ModConfig.categoryOrder));
-
-			QuestState state = QuestState.getServerState(server);
-			UUID playerId = player.getUuid();
-
-			// Send both quest definition and its current progress to the joining player
-			for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
-				int progress = state.getProgress(playerId, quest.id());
-				boolean finished = state.isFinished(playerId, quest.id());
-				boolean claimed = state.isClaimed(playerId, quest.id());
-
-				ServerPlayNetworking.send(player, new QuestSyncPayload(quest, server.getRegistryManager()));
-
-				ServerPlayNetworking.send(player, new QuestProgressPayload(quest.id(), progress, finished, claimed));
-			}
+			ServerNetworkHandler.syncToPlayer(handler.player);
 		});
 
-		// Register gameplay task listeners and server network handlers
-		QuestEventHandler.register();
-		ServerNetworkHandler.register();
+		// Register gameplay task listeners
+		FabricQuestEventHandler.register();
 	}
 }

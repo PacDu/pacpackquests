@@ -1,16 +1,18 @@
 package fr.pacdu.pacpackquests.network;
 
+import fr.pacdu.pacpackquests.Constants;
+
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.QuestTask;
 import fr.pacdu.pacpackquests.reward.QuestReward;
 import fr.pacdu.pacpackquests.util.ItemUtils;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,11 +30,11 @@ public record QuestSyncPayload(
         Map<String, String> properties,
         List<QuestTask> tasks,
         List<QuestReward> rewards
-) implements CustomPayload {
+) implements CustomPacketPayload {
 
-    public static final Id<QuestSyncPayload> ID = new Id<>(Identifier.of("pacpackquests", "quest_sync"));
+    public static final Type<QuestSyncPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(Constants.MOD_ID, "quest_sync"));
 
-    public QuestSyncPayload(QuestDefinition quest, RegistryWrapper.WrapperLookup registries) {
+    public QuestSyncPayload(QuestDefinition quest, HolderLookup.Provider registries) {
         this(
                 quest.id(),
                 quest.title(),
@@ -47,40 +49,40 @@ public record QuestSyncPayload(
         );
     }
 
-    public static final PacketCodec<RegistryByteBuf, QuestSyncPayload> CODEC = PacketCodec.of(
-            (value, buf) -> {
-                buf.writeString(value.questId());
-                buf.writeString(value.title());
-                buf.writeString(value.category());
-                buf.writeString(value.iconId());
+    public static final StreamCodec<RegistryFriendlyByteBuf, QuestSyncPayload> CODEC = StreamCodec.of(
+            (buf, value) -> {
+                buf.writeUtf(value.questId());
+                buf.writeUtf(value.title());
+                buf.writeUtf(value.category());
+                buf.writeUtf(value.iconId());
                 buf.writeInt(value.displayX());
                 buf.writeInt(value.displayY());
-                buf.writeCollection(value.parents(), PacketByteBuf::writeString);
-                buf.writeMap(value.properties(), PacketByteBuf::writeString, PacketByteBuf::writeString);
+                buf.writeCollection(value.parents(), FriendlyByteBuf::writeUtf);
+                buf.writeMap(value.properties(), (b, k) -> b.writeUtf(k), (b, v) -> b.writeUtf(v));
                 buf.writeCollection(value.tasks(), (b, task) -> task.write(b));
                 buf.writeCollection(value.rewards(), (b, reward) -> reward.write(b));
             },
             buf -> new QuestSyncPayload(
-                    buf.readString(),
-                    buf.readString(),
-                    buf.readString(),
-                    buf.readString(),
+                    buf.readUtf(),
+                    buf.readUtf(),
+                    buf.readUtf(),
+                    buf.readUtf(),
                     buf.readInt(),
                     buf.readInt(),
-                    buf.readCollection(ArrayList::new, PacketByteBuf::readString),
-                    buf.readMap(HashMap::new, PacketByteBuf::readString, PacketByteBuf::readString),
+                    buf.readCollection(ArrayList::new, FriendlyByteBuf::readUtf),
+                    buf.readMap(HashMap::new, FriendlyByteBuf::readUtf, FriendlyByteBuf::readUtf),
                     buf.readCollection(ArrayList::new, QuestTask::read),
                     buf.readCollection(ArrayList::new, QuestReward::read)
             )
     );
 
-    public QuestDefinition toDefinition(RegistryWrapper.WrapperLookup registries) {
+    public QuestDefinition toDefinition(HolderLookup.Provider registries) {
         ItemStack icon = ItemUtils.fromCommandString(iconId, registries);
         return new QuestDefinition(questId, title, category, icon, displayX, displayY, parents, properties, tasks, rewards);
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

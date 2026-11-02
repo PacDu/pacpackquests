@@ -5,22 +5,22 @@ import fr.pacdu.pacpackquests.TaskType;
 import fr.pacdu.pacpackquests.client.config.ClientConfig;
 import fr.pacdu.pacpackquests.network.*;
 import fr.pacdu.pacpackquests.client.util.TranslationUtils;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.ConfirmScreen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
+import fr.pacdu.pacpackquests.platform.Services;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.ConfirmScreen;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import fr.pacdu.pacpackquests.client.gui.ScrollbarWidget;
 import fr.pacdu.pacpackquests.util.PathSecurity;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.client.resource.language.I18n;
-import net.minecraft.command.DefaultPermissions;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.server.permissions.Permissions;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,8 +28,9 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static fr.pacdu.pacpackquests.PacPackQuests.DEFAULT_CATEGORY_NAME;
-import static fr.pacdu.pacpackquests.client.PacPackQuestsClient.*;
+import static fr.pacdu.pacpackquests.Constants.DEFAULT_CATEGORY_NAME;
+import static fr.pacdu.pacpackquests.client.ClientQuestData.*;
+import fr.pacdu.pacpackquests.client.ClientQuestData;
 import static fr.pacdu.pacpackquests.config.ModConfig.maxGridColumns;
 import static fr.pacdu.pacpackquests.config.ModConfig.maxGridRows;
 
@@ -39,8 +40,8 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 	private static String selectedCategory = DEFAULT_CATEGORY_NAME;
 
-	private ButtonWidget claimAllButton;
-	private TextFieldWidget inlineCategoryField;
+	private Button claimAllButton;
+	private EditBox inlineCategoryField;
 
 	// --- Edit Mode System ---
 	private boolean isEditMode = false;
@@ -65,11 +66,11 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	record GridPos(int x, int y) {}
 
 	public QuestScreen() {
-		super(Text.translatable("gui.pacpackquests.quest_menu"));
+		super(Component.translatable("gui.pacpackquests.quest_menu"));
 	}
 
 	@Override
-	public boolean shouldPause() {
+	public boolean isPauseScreen() {
 		return false;
 	}
 
@@ -81,44 +82,44 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		int buttonHeight = 20;
 
 		// "Done" Button (Shifted left)
-		this.addDrawableChild(
-				ButtonWidget.builder(Text.translatable("gui.done"), button -> this.close())
-						.dimensions((this.width / 2) - buttonWidth - 5, this.height - 35, buttonWidth, buttonHeight)
+		this.addRenderableWidget(
+				Button.builder(Component.translatable("gui.done"), button -> this.onClose())
+						.bounds((this.width / 2) - buttonWidth - 5, this.height - 35, buttonWidth, buttonHeight)
 						.build()
 		);
 
 		// "Claim All" Button (Shifted right)
-		this.claimAllButton = ButtonWidget.builder(Text.translatable("gui.pacpackquests.claim_all"), button -> claimAllQuests())
-				.dimensions((this.width / 2) + 5, this.height - 35, buttonWidth, buttonHeight)
+		this.claimAllButton = Button.builder(Component.translatable("gui.pacpackquests.claim_all"), button -> claimAllQuests())
+				.bounds((this.width / 2) + 5, this.height - 35, buttonWidth, buttonHeight)
 				.build();
 
 		// Set initial state
 		this.claimAllButton.active = hasClaimableQuests();
-		this.addDrawableChild(this.claimAllButton);
+		this.addRenderableWidget(this.claimAllButton);
 
 		// "Edit Mode" Toggle Button (Only visible if player is OP)
-		if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().player.getPermissions().hasPermission(DefaultPermissions.GAMEMASTERS)) {
-			this.addDrawableChild(
-					ButtonWidget.builder(Text.literal(I18n.translate("gui.pacpackquests.edit") + ": " + (isEditMode ? "ON" : "OFF")).formatted(isEditMode ? Formatting.GREEN : Formatting.RED), button -> {
+		if (Minecraft.getInstance().player != null && Minecraft.getInstance().player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+			this.addRenderableWidget(
+					Button.builder(Component.literal(I18n.get("gui.pacpackquests.edit") + ": " + (isEditMode ? "ON" : "OFF")).withStyle(isEditMode ? ChatFormatting.GREEN : ChatFormatting.RED), button -> {
 								this.isEditMode = !this.isEditMode;
-								this.clearAndInit(); // Refresh screen to update button text and visuals
+								this.rebuildWidgets(); // Refresh screen to update button text and visuals
 								this.clampPanning();
 							})
-							.dimensions(startX + windowWidth - buttonWidth, startY - 25, buttonWidth, buttonHeight)
+							.bounds(startX + windowWidth - buttonWidth, startY - 25, buttonWidth, buttonHeight)
 							.build()
 			);
 		}
 
 		// --- Categories Setup ---
-		this.inlineCategoryField = new TextFieldWidget(this.textRenderer, startX - tabWidth, 0, tabWidth, tabHeight, Text.empty()) {
+		this.inlineCategoryField = new EditBox(this.font, startX - tabWidth, 0, tabWidth, tabHeight, Component.empty()) {
 			@Override
-			public void write(String text) {
-				super.write(PathSecurity.formatStringToValidPath(text));
+			public void insertText(String text) {
+				super.insertText(PathSecurity.formatStringToValidPath(text));
 			}
 		};
 		this.inlineCategoryField.setMaxLength(categoryNameMaxChars);
 		this.inlineCategoryField.setVisible(false);
-		this.addDrawableChild(this.inlineCategoryField);
+		this.addRenderableWidget(this.inlineCategoryField);
 
 		this.categoryEditTarget = null;
 
@@ -192,7 +193,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	}
 
 	@Override
-	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+	public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
 		super.render(context, mouseX, mouseY, delta);
 		super.drawBackgroundFrame(context, this.title);
 
@@ -220,7 +221,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 		context.enableScissor(tabX - 40, startY + categMarginTop, startX, startY + windowHeight - categMarginBottom);
 		
-		context.getMatrices().translate(0f, (float)-scrollAmount);
+		context.pose().translate(0.0f, (float) -scrollAmount);
 
 		String hoveredTruncatedCategory = null;
 		int maxTextWidth = tabWidth - 8;
@@ -248,13 +249,13 @@ public class QuestScreen extends AbstractQuestGridScreen {
 					String fullCategory = category.toUpperCase().replace("_", " ");
 					String displayCategory = fullCategory;
 					boolean isTruncated = false;
-					if (this.textRenderer.getWidth(fullCategory) > maxTextWidth) {
-						int ellipsisWidth = this.textRenderer.getWidth("...");
-						displayCategory = this.textRenderer.trimToWidth(fullCategory, maxTextWidth - ellipsisWidth) + "...";
+					if (this.font.width(fullCategory) > maxTextWidth) {
+						int ellipsisWidth = this.font.width("...");
+						displayCategory = this.font.plainSubstrByWidth(fullCategory, maxTextWidth - ellipsisWidth) + "...";
 						isTruncated = true;
 					}
 
-					context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(displayCategory), tabX + tabWidth / 2, currentTabY + 6, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA);
+					context.drawCenteredString(this.font, Component.literal(displayCategory), tabX + tabWidth / 2, currentTabY + 6, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA);
 
 					if (isTabHovered && isTruncated) {
 						hoveredTruncatedCategory = fullCategory;
@@ -266,13 +267,13 @@ public class QuestScreen extends AbstractQuestGridScreen {
 					int delBtnY = currentTabY + 4;
 					boolean isHoverDelBtn = isHovering(delBtnX, delBtnY, 10, 10, mouseX, (int)(mouseY + scrollAmount));
 					context.fill(delBtnX, delBtnY, delBtnX + 10, delBtnY + 10, isHoverDelBtn ? 0xFFCC1111 : 0xFF991111);
-					context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("x").formatted(Formatting.BOLD), delBtnX + 5, delBtnY + 1, isHoverDelBtn ? 0xFFFFFFFF : 0xFFAAAAAA);
+					context.drawCenteredString(this.font, Component.literal("x").withStyle(ChatFormatting.BOLD), delBtnX + 5, delBtnY + 1, isHoverDelBtn ? 0xFFFFFFFF : 0xFFAAAAAA);
 
 					int editBtnX = delBtnX - 14;
 					int editBtnY = currentTabY + 4;
 					boolean isHoverEditBtn = isHovering(editBtnX, editBtnY, 10, 10, mouseX, (int)(mouseY + scrollAmount));
 					context.fill(editBtnX, editBtnY, editBtnX + 10, editBtnY + 10, isHoverEditBtn ? 0xFF666666 : 0xFF333333);
-					context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("\u270E").formatted(Formatting.BOLD), editBtnX + 5, editBtnY + 1, isHoverEditBtn ? 0xFFFFFFFF : 0xFFAAAAAA);
+					context.drawCenteredString(this.font, Component.literal("\u270E").withStyle(ChatFormatting.BOLD), editBtnX + 5, editBtnY + 1, isHoverEditBtn ? 0xFFFFFFFF : 0xFFAAAAAA);
 				}
 			}
 			currentTabY += tabHeight + 5;
@@ -290,11 +291,11 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			context.fill(tabX, floatY, tabX + tabWidth, floatY + tabHeight, 0xFF888888);
 			String fullCategory = draggedCategory.toUpperCase();
 			String displayCategory = fullCategory;
-			if (this.textRenderer.getWidth(fullCategory) > maxTextWidth) {
-				int ellipsisWidth = this.textRenderer.getWidth("...");
-				displayCategory = this.textRenderer.trimToWidth(fullCategory, maxTextWidth - ellipsisWidth) + "...";
+			if (this.font.width(fullCategory) > maxTextWidth) {
+				int ellipsisWidth = this.font.width("...");
+				displayCategory = this.font.plainSubstrByWidth(fullCategory, maxTextWidth - ellipsisWidth) + "...";
 			}
-			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(displayCategory), tabX + tabWidth / 2, floatY + 6, 0xFFFFFFFF);
+			context.drawCenteredString(this.font, Component.literal(displayCategory), tabX + tabWidth / 2, floatY + 6, 0xFFFFFFFF);
 		}
 
 		// --- ADD CATEGORY BUTTON / INLINE FIELD ---
@@ -302,11 +303,11 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			if (!this.inlineCategoryField.isVisible() || this.categoryEditTarget != null) {
 				boolean isHover = isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, (int)(mouseY + scrollAmount));
 				context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, isHover ? 0xFF666666 : 0xFF444444);
-				context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("+").formatted(Formatting.BOLD), tabX + tabWidth / 2, currentTabY + 6, isHover ? 0xFFFFFFFF : 0xFFBBBBBB);
+				context.drawCenteredString(this.font, Component.literal("+").withStyle(ChatFormatting.BOLD), tabX + tabWidth / 2, currentTabY + 6, isHover ? 0xFFFFFFFF : 0xFFBBBBBB);
 			}
 		}
 
-		context.getMatrices().translate(0f, (float)scrollAmount);
+		context.pose().translate(0.0f, (float) scrollAmount);
 		context.disableScissor();
 
 		// --- CATEGORY SCROLLBAR ---
@@ -323,9 +324,9 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 		context.enableScissor(startX, startY, startX + windowWidth, startY + windowHeight);
 
-		context.getMatrices().pushMatrix();
-		context.getMatrices().translate((float) (startX + panX), (float) (startY + panY));
-		context.getMatrices().scale(zoom, zoom);
+		context.pose().pushMatrix();
+		context.pose().translate((float) (startX + panX), (float) (startY + panY));
+		context.pose().scale(zoom, zoom);
 
 		// Draw Helper Grid in Edit Mode
 		if (isEditMode) {
@@ -408,31 +409,31 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			renderNode(context, movingNode, localMouseX, localMouseY, false);
 		}
 
-		context.getMatrices().popMatrix();
+		context.pose().popMatrix();
 
 		// --- DRAW TOOLTIP ---
 		if (hoveredNode != null && !isEditMode) { // Tooltips can get in the way during editing
 			drawQuestTooltip(context, hoveredNode, mouseX, mouseY);
 		} else if (hoveredNode != null) {
-			List<Text> editTooltip = new ArrayList<>();
-			editTooltip.add(Text.translatable("gui.pacpackquests.edit_action").formatted(Formatting.YELLOW, Formatting.BOLD));
-			editTooltip.add(Text.translatable("gui.pacpackquests.click_drag").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpackquests.to_move").formatted(Formatting.WHITE)));
-			editTooltip.add(Text.translatable("gui.pacpackquests.right_click").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpackquests.to_edit_delete").formatted(Formatting.WHITE)));
-			editTooltip.add(Text.translatable("gui.pacpackquests.middle_click").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpackquests.to_duplicate").formatted(Formatting.WHITE)));
-			context.drawTooltip(this.textRenderer, editTooltip, mouseX, mouseY);
+			List<Component> editTooltip = new ArrayList<>();
+			editTooltip.add(Component.translatable("gui.pacpackquests.edit_action").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD));
+			editTooltip.add(Component.translatable("gui.pacpackquests.click_drag").withStyle(ChatFormatting.GRAY).append(" ").append(Component.translatable("gui.pacpackquests.to_move").withStyle(ChatFormatting.WHITE)));
+			editTooltip.add(Component.translatable("gui.pacpackquests.right_click").withStyle(ChatFormatting.GRAY).append(" ").append(Component.translatable("gui.pacpackquests.to_edit_delete").withStyle(ChatFormatting.WHITE)));
+			editTooltip.add(Component.translatable("gui.pacpackquests.middle_click").withStyle(ChatFormatting.GRAY).append(" ").append(Component.translatable("gui.pacpackquests.to_duplicate").withStyle(ChatFormatting.WHITE)));
+			context.setTooltipForNextFrame(this.font, editTooltip, java.util.Optional.empty(), mouseX, mouseY);
 		} else if (hoveredDotX >= 0 && hoveredDotY >= 0 && isEditMode) {
-			List<Text> editTooltip = new ArrayList<>();
-			editTooltip.add(Text.translatable("gui.pacpackquests.edit_action").formatted(Formatting.YELLOW, Formatting.BOLD));
-			editTooltip.add(Text.translatable("gui.pacpackquests.right_click").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpackquests.to_add").formatted(Formatting.WHITE)));
-			context.drawTooltip(this.textRenderer, editTooltip, mouseX, mouseY);
+			List<Component> editTooltip = new ArrayList<>();
+			editTooltip.add(Component.translatable("gui.pacpackquests.edit_action").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD));
+			editTooltip.add(Component.translatable("gui.pacpackquests.right_click").withStyle(ChatFormatting.GRAY).append(" ").append(Component.translatable("gui.pacpackquests.to_add").withStyle(ChatFormatting.WHITE)));
+			context.setTooltipForNextFrame(this.font, editTooltip, java.util.Optional.empty(), mouseX, mouseY);
 		}
 
 		if (hoveredTruncatedCategory != null && draggedQuestId == null && draggedCategory == null) {
-			context.drawTooltip(this.textRenderer, Text.literal(hoveredTruncatedCategory), mouseX, mouseY);
+			context.setTooltipForNextFrame(this.font, Component.literal(hoveredTruncatedCategory), mouseX, mouseY);
 		}
 	}
 
-	private void renderNode(DrawContext context, QuestNode quest, double localMouseX, double localMouseY, boolean checkHover) {
+	private void renderNode(GuiGraphics context, QuestNode quest, double localMouseX, double localMouseY, boolean checkHover) {
 		int progress = CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
 		boolean claimed = CLIENT_CLAIMED.getOrDefault(quest.id(), false);
 
@@ -447,59 +448,59 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		}
 		super.renderNodeBase(context, quest, bgColor);
 
-		Text textToDraw;
+		Component textToDraw;
 		int textColor;
 		if (quest.isLocked()) {
-			textToDraw = Text.literal("???");
+			textToDraw = Component.literal("???");
 			textColor = 0xFFFF5555;
 		} else if (claimed) {
-			textToDraw = Text.literal(progress + "/" + quest.requiredAmount());
+			textToDraw = Component.literal(progress + "/" + quest.requiredAmount());
 			textColor = 0xFF55FF55;
 		} else {
-			textToDraw = Text.literal(progress + "/" + quest.requiredAmount());
+			textToDraw = Component.literal(progress + "/" + quest.requiredAmount());
 			textColor = progress >= quest.requiredAmount() ? 0xFFFFFF55 : 0xFFAAAAAA;
 		}
 
-		context.drawCenteredTextWithShadow(this.textRenderer, textToDraw, quest.x() + 8, quest.y() + 22, textColor);
+		context.drawCenteredString(this.font, textToDraw, quest.x() + 8, quest.y() + 22, textColor);
 	}
 
-	private void drawQuestTooltip(DrawContext context, QuestNode quest, int mouseX, int mouseY) {
+	private void drawQuestTooltip(GuiGraphics context, QuestNode quest, int mouseX, int mouseY) {
 		int progress = CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
 		int requiredAmount = CLIENT_DEFINITIONS.get(quest.id()).requiredAmount();
 		boolean claimed = CLIENT_CLAIMED.getOrDefault(quest.id(), false);
 
-		List<Text> tooltip = new ArrayList<>();
+		List<Component> tooltip = new ArrayList<>();
 
 		// 1. Title
-		tooltip.add((I18n.hasTranslation(quest.title()) ? Text.translatable(quest.title()) : Text.literal(quest.title())).formatted(Formatting.GOLD, Formatting.BOLD));
+		tooltip.add((I18n.exists(quest.title()) ? Component.translatable(quest.title()) : Component.literal(quest.title())).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
 
 		// 2. Status and Progress
-		MutableText statusLabel = Text.translatable("gui.pacpackquests.status").append(": ").formatted(Formatting.GRAY);
+		MutableComponent statusLabel = Component.translatable("gui.pacpackquests.status").append(": ").withStyle(ChatFormatting.GRAY);
 
 		if (claimed) {
-			tooltip.add(statusLabel.append(Text.translatable("gui.pacpackquests.claimed").formatted(Formatting.GREEN)));
+			tooltip.add(statusLabel.append(Component.translatable("gui.pacpackquests.claimed").withStyle(ChatFormatting.GREEN)));
 		} else if (progress >= requiredAmount) {
-			tooltip.add(statusLabel.append(Text.translatable("gui.pacpackquests.ready_to_claim").formatted(Formatting.YELLOW)));
+			tooltip.add(statusLabel.append(Component.translatable("gui.pacpackquests.ready_to_claim").withStyle(ChatFormatting.YELLOW)));
 		} else if (quest.isLocked()) {
-			tooltip.add(statusLabel.append(Text.translatable("gui.pacpackquests.locked").formatted(Formatting.RED)));
+			tooltip.add(statusLabel.append(Component.translatable("gui.pacpackquests.locked").withStyle(ChatFormatting.RED)));
 		} else {
 			// Task target (e.g., Craft: Shield)
-			tooltip.add(Text.translatable("gui.pacpackquests." + quest.taskType().toString().toLowerCase())
+			tooltip.add(Component.translatable("gui.pacpackquests." + quest.taskType().toString().toLowerCase())
 					.append(": ")
-					.append(Text.literal(TranslationUtils.getTranslatedName(quest.target(), TaskType.getRegistryType(quest.taskType()))))
-					.formatted(Formatting.GRAY));
+					.append(Component.literal(TranslationUtils.getTranslatedName(quest.target(), TaskType.getRegistryType(quest.taskType()))))
+					.withStyle(ChatFormatting.GRAY));
 
 			// Progress (e.g., Progress: 0 / 1)
-			tooltip.add(Text.translatable("gui.pacpackquests.progress")
+			tooltip.add(Component.translatable("gui.pacpackquests.progress")
 					.append(": " + progress + " / " + requiredAmount)
-					.formatted(Formatting.GRAY));
+					.withStyle(ChatFormatting.GRAY));
 		}
 
 		// 3. Reward
-		MutableText rewardLabel = Text.translatable("gui.pacpackquests.reward").append(": ").formatted(Formatting.GRAY);
+		MutableComponent rewardLabel = Component.translatable("gui.pacpackquests.reward").append(": ").withStyle(ChatFormatting.GRAY);
 		tooltip.add(rewardLabel.append(TranslationUtils.getRewardText(quest.definition().primaryReward(), claimed)));
 
-		context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
+		context.setTooltipForNextFrame(this.font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
 	}
 
 	private QuestNode getQuestById(String id) {
@@ -510,7 +511,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	}
 
 	@Override
-	public boolean mouseClicked(Click click, boolean doubled) {
+	public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
 		if (draggedQuestId != null) return true;
 
 		double mouseX = click.x();
@@ -542,15 +543,15 @@ public class QuestScreen extends AbstractQuestGridScreen {
 						int delBtnX = tabX - 14;
 						int delBtnY = currentTabY + 4;
 						if (mouseX >= delBtnX && mouseX <= delBtnX + 10 && adjustedMouseY >= delBtnY && adjustedMouseY <= delBtnY + 10) {
-							this.client.setScreen(new ConfirmScreen(
+							this.minecraft.setScreen(new ConfirmScreen(
 									confirmed -> {
 										if (confirmed) {
-											ClientPlayNetworking.send(new DeleteCategoryPayload(category));
+											Services.NETWORK.sendToServer(new DeleteCategoryPayload(category));
 										}
-										this.client.setScreen(this);
+										this.minecraft.setScreen(this);
 									},
-									Text.translatable("gui.pacpackquests.delete_category_title"),
-									Text.translatable("gui.pacpackquests.delete_category_desc").append(" " + category.toUpperCase() + " ?")
+									Component.translatable("gui.pacpackquests.delete_category_title"),
+									Component.translatable("gui.pacpackquests.delete_category_desc").append(" " + category.toUpperCase() + " ?")
 							));
 							return true;
 						}
@@ -562,7 +563,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 							this.inlineCategoryField.setX(tabX);
 							this.inlineCategoryField.setWidth(tabWidth);
 							this.inlineCategoryField.setY((int)(currentTabY - scrollAmount));
-							this.inlineCategoryField.setText(category);
+							this.inlineCategoryField.setValue(category);
 							this.inlineCategoryField.setVisible(true);
 							this.setFocused(this.inlineCategoryField);
 							this.inlineCategoryField.setFocused(true);
@@ -596,7 +597,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 						this.inlineCategoryField.setX(tabX);
 						this.inlineCategoryField.setWidth(tabWidth);
 						this.inlineCategoryField.setY((int)(currentTabY - scrollAmount));
-						this.inlineCategoryField.setText("");
+						this.inlineCategoryField.setValue("");
 						this.inlineCategoryField.setVisible(true);
 						this.setFocused(this.inlineCategoryField);
 						this.inlineCategoryField.setFocused(true);
@@ -619,7 +620,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 				for (QuestNode quest : questList) {
 					if (isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
 						// Edit existing quest
-						MinecraftClient.getInstance().setScreen(new EditQuestScreen(this, quest.id(), selectedCategory, quest.displayX(), quest.displayY()));
+						Minecraft.getInstance().setScreen(new EditQuestScreen(this, quest.id(), selectedCategory, quest.displayX(), quest.displayY()));
 						return true;
 					}
 				}
@@ -631,7 +632,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 					// Create new quest on empty nodes
 					int gridX = Math.round(((float) localMouseX - canvasOffsetX) / gridSpacing);
 					int gridY = Math.round(((float) localMouseY - canvasOffsetY) / gridSpacing);
-					MinecraftClient.getInstance().setScreen(new EditQuestScreen(this, null, selectedCategory, gridX, gridY));
+					Minecraft.getInstance().setScreen(new EditQuestScreen(this, null, selectedCategory, gridX, gridY));
 					return true;
 				}
 			} else if (click.button() == 2) { // Middle Click: Duplicate Quest
@@ -671,7 +672,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 						boolean isClaimed = CLIENT_CLAIMED.getOrDefault(quest.id(), false);
 
 						if (currentProg >= requiredAmount && !isClaimed) {
-							ClientPlayNetworking.send(new ClaimQuestPayload(quest.id()));
+							Services.NETWORK.sendToServer(new ClaimQuestPayload(quest.id()));
 						}
 						return true;
 					}
@@ -682,7 +683,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	}
 
 	@Override
-	public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+	public boolean mouseDragged(MouseButtonEvent click, double offsetX, double offsetY) {
 		if (categoryScrollbar.mouseDragged(click.x(), click.y(), click.button(), offsetX, offsetY)) {
 			if (this.inlineCategoryField != null && this.inlineCategoryField.isVisible()) {
 				this.inlineCategoryField.setVisible(false);
@@ -705,7 +706,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	}
 
 	@Override
-	public boolean mouseReleased(Click click) {
+	public boolean mouseReleased(MouseButtonEvent click) {
 		if (categoryScrollbar.mouseReleased(click.x(), click.y(), click.button())) {
 			return true;
 		}
@@ -720,7 +721,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			dropIndex = Math.clamp(dropIndex, 0, CLIENT_CATEGORIES.size());
 			CLIENT_CATEGORIES.add(dropIndex, draggedCategory);
 
-			ClientPlayNetworking.send(new ReorderCategoryPayload(CLIENT_CATEGORIES));
+			Services.NETWORK.sendToServer(new ReorderCategoryPayload(CLIENT_CATEGORIES));
 
 			draggedCategory = null;
 			refreshUI();
@@ -765,12 +766,12 @@ public class QuestScreen extends AbstractQuestGridScreen {
 				if (duplicatedQuest != null) {
 					duplicatedQuest = null;
 					draggedQuestId = null;
-					MinecraftClient.getInstance().setScreen(new EditQuestScreen(this, null, selectedCategory, finalX, finalY, oldDef));
+					Minecraft.getInstance().setScreen(new EditQuestScreen(this, null, selectedCategory, finalX, finalY, oldDef));
 				}
 
 				// Only send packet and update if the position actually changed
 				else if (finalX != oldDef.displayX() || finalY != oldDef.displayY()) {
-					ClientPlayNetworking.send(new MoveQuestPayload(draggedQuestId, finalX, finalY));
+					Services.NETWORK.sendToServer(new MoveQuestPayload(draggedQuestId, finalX, finalY));
 
 					QuestDefinition newDef = oldDef.withPosition(finalX, finalY);
 					CLIENT_DEFINITIONS.put(draggedQuestId, newDef);
@@ -800,26 +801,26 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	}
 
 	@Override
-	public boolean keyPressed(KeyInput input) {
+	public boolean keyPressed(KeyEvent input) {
 		if (this.inlineCategoryField.isVisible() && this.inlineCategoryField.isFocused()) {
-			if (input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER || input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
-				String newName = this.inlineCategoryField.getText().trim().toLowerCase(Locale.ROOT).replace(" ", "_");
+			if (input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER || input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
+				String newName = this.inlineCategoryField.getValue().trim().toLowerCase(Locale.ROOT).replace(" ", "_");
 				if (PathSecurity.isValidIdentifier(newName) && categoryEditTarget == null) {
 					if (!CLIENT_CATEGORIES.contains(newName)) {
-						ClientPlayNetworking.send(new CreateCategoryPayload(newName));
+						Services.NETWORK.sendToServer(new CreateCategoryPayload(newName));
 						addNewCategory(newName);
 					}
 				} else if (PathSecurity.isValidIdentifier(newName) && !categoryEditTarget.equals(newName)) {
-					ClientPlayNetworking.send(new EditCategoryPayload(categoryEditTarget, newName));
+					Services.NETWORK.sendToServer(new EditCategoryPayload(categoryEditTarget, newName));
 				}
 				this.inlineCategoryField.setVisible(false);
-				this.inlineCategoryField.setText("");
+				this.inlineCategoryField.setValue("");
 				categoryEditTarget = null;
 				return true;
 			}
-			else if (input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+			else if (input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
 				this.inlineCategoryField.setVisible(false);
-				this.inlineCategoryField.setText("");
+				this.inlineCategoryField.setValue("");
 				categoryEditTarget = null;
 				return true;
 			}
@@ -827,15 +828,15 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		}
 
 		if (duplicatedQuest != null) {
-			if (input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE)  {
+			if (input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE)  {
 				duplicatedQuest = null;
 				draggedQuestId = null;
 				return true;
 			}
 		}
 
-		if (openQuestMenuKey.matchesKey(input)) {
-			this.close();
+		if (ClientQuestData.openQuestMenuKey != null && ClientQuestData.openQuestMenuKey.matches(input)) {
+			this.onClose();
 			return true;
 		}
 		return super.keyPressed(input);
@@ -904,7 +905,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 				// Send standard claim payload if unlocked
 				if (!isLocked) {
-					ClientPlayNetworking.send(new ClaimQuestPayload(quest.id()));
+					Services.NETWORK.sendToServer(new ClaimQuestPayload(quest.id()));
 				}
 			}
 		}
@@ -1007,6 +1008,6 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	}
 
 	public void refreshUI() {
-		this.clearAndInit();
+		this.rebuildWidgets();
 	}
 }
