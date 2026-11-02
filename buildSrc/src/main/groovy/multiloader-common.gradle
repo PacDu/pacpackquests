@@ -13,6 +13,13 @@ java {
     withJavadocJar()
 }
 
+tasks.withType(Javadoc).configureEach {
+    options.encoding = 'UTF-8'
+    if (options instanceof StandardJavadocDocletOptions) {
+        options.addStringOption('Xdoclint:accessibility,html,reference,syntax', '-quiet')
+    }
+}
+
 repositories {
     mavenCentral()
     // https://docs.gradle.org/current/userguide/declaring_repositories.html#declaring_content_exclusively_found_in_one_repository

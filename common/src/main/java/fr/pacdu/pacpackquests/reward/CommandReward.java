@@ -12,6 +12,13 @@ import net.minecraft.server.permissions.PermissionSet;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
+/**
+ * A quest reward that executes a server command on behalf of or targeting the player upon claiming.
+ *
+ * @param command The command string to execute (e.g. "/effect give @s speed 60 1").
+ * @param description An optional friendly description explaining what the command does.
+ * @param amount The number of times the command should be run (or repeat count).
+ */
 public record CommandReward(String command, String description, int amount) implements QuestReward {
 
     @Override
@@ -51,15 +58,18 @@ public record CommandReward(String command, String description, int amount) impl
     @Override
     public void write(FriendlyByteBuf buf) {
         buf.writeEnum(RewardType.COMMAND);
-        buf.writeUtf(command != null ? command : "");
-        buf.writeUtf(description != null ? description : "");
-        buf.writeInt(amount);
+        buf.writeUtf(this.command != null ? this.command : "");
+        buf.writeUtf(this.description != null ? this.description : "");
+        buf.writeInt(this.amount);
     }
 
+    /**
+     * Reads a {@link CommandReward} from the network buffer.
+     *
+     * @param buf The buffer to read from.
+     * @return The read {@link CommandReward}.
+     */
     public static CommandReward read(FriendlyByteBuf buf) {
-        String command = buf.readUtf();
-        String description = buf.readUtf();
-        int amount = buf.readInt();
-        return new CommandReward(command, description, amount);
+        return new CommandReward(buf.readUtf(), buf.readUtf(), buf.readInt());
     }
 }

@@ -9,12 +9,31 @@ import net.minecraft.server.level.ServerPlayer;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Handles server-side progression updates, prerequisite dependency validation, and client packet synchronization.
+ */
 public class QuestProgressHandler {
 
+    private QuestProgressHandler() {}
+
+    /**
+     * Increments the current progress of a quest for a player by a given delta, checking parent dependencies.
+     *
+     * @param player The {@link ServerPlayer} making progress.
+     * @param quest The {@link QuestDefinition} being progressed.
+     * @param amountToAdd The quantity to add to current progress.
+     */
     public static void incrementProgress(ServerPlayer player, QuestDefinition quest, int amountToAdd) {
         setProgress(player, quest, amountToAdd, true);
     }
 
+    /**
+     * Sets the absolute progress value of a quest for a player, clamping to max required amount.
+     *
+     * @param player The {@link ServerPlayer}.
+     * @param quest The {@link QuestDefinition}.
+     * @param amountToSet The absolute progress amount to set.
+     */
     public static void setProgress(ServerPlayer player, QuestDefinition quest, int amountToSet) {
         setProgress(player, quest, amountToSet, false);
     }

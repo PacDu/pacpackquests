@@ -14,22 +14,38 @@ import net.minecraft.world.level.saveddata.SavedDataType;
 import java.util.*;
 
 /**
- * Represents the persistent save data for all players' quest progress.
- * This state is saved to the world's data folder (data/pacpackquests_data.dat).
+ * Represents the persistent save data for all players' quest progress, claims, and structure discoveries.
+ * This state is saved to the world's data storage (data/pacpackquests_data.dat).
  */
 public class QuestState extends SavedData {
 
-    // Structure: Player UUID -> (Quest ID -> Value)
+    /** Player UUID -> (Quest ID -> Progress count) */
     public final Map<UUID, Map<String, Integer>> progress = new HashMap<>();
+
+    /** Player UUID -> (Quest ID -> Claimed status) */
     public final Map<UUID, Map<String, Boolean>> claimed = new HashMap<>();
 
-    // Structure: Player UUID -> (Quest ID -> Set of discovered ChunkPos as Longs)
+    /** Player UUID -> (Quest ID -> Set of discovered structure chunk coordinate longs) */
     public final Map<UUID, Map<String, Set<Long>>> discoveredStructures = new HashMap<>();
 
+    /**
+     * Gets the current progress value for a quest by player UUID.
+     *
+     * @param player The player UUID.
+     * @param questId The quest identifier.
+     * @return The current progress count.
+     */
     public int getProgress(UUID player, String questId) {
         return progress.getOrDefault(player, new HashMap<>()).getOrDefault(questId, 0);
     }
 
+    /**
+     * Updates the progress of a quest for a player and triggers completion toast if newly completed.
+     *
+     * @param player The {@link ServerPlayer}.
+     * @param questId The quest ID.
+     * @param amount The new progress value.
+     */
     public void setProgress(ServerPlayer player, String questId, int amount) {
         QuestDefinition quest = QuestManager.LOADED_QUESTS.get(questId);
         if (quest == null) return;
@@ -47,108 +63,168 @@ public class QuestState extends SavedData {
         }
     }
 
+    /**
+     * Checks if a player has reached the required amount to finish a quest.
+     *
+     * @param player The player UUID.
+     * @param questId The quest ID.
+     * @return {@code true} if completed; {@code false} otherwise.
+     */
     public boolean isFinished(UUID player, String questId) {
         QuestDefinition quest = QuestManager.LOADED_QUESTS.get(questId);
         if (quest == null) return false;
-        int currentProgress = getProgress(player, quest.id());
-        return currentProgress >= quest.requiredAmount();
+        return getProgress(player, questId) >= quest.requiredAmount();
     }
 
+    /**
+     * Checks if a player has already claimed the rewards for a quest.
+     *
+     * @param player The player UUID.
+     * @param questId The quest ID.
+     * @return {@code true} if claimed; {@code false} otherwise.
+     */
     public boolean isClaimed(UUID player, String questId) {
         return claimed.getOrDefault(player, new HashMap<>()).getOrDefault(questId, false);
     }
 
+    /**
+     * Updates the claimed status of a quest for a player.
+     *
+     * @param player The player UUID.
+     * @param questId The quest ID.
+     * @param isClaimed {@code true} if claimed; {@code false} otherwise.
+     */
     public void setClaimed(UUID player, String questId, boolean isClaimed) {
         claimed.computeIfAbsent(player, k -> new HashMap<>()).put(questId, isClaimed);
         this.setDirty();
     }
 
-    // --- New Methods for Structure Tracking ---
-
-    public boolean hasDiscoveredStructure(UUID player, String questId, long chunkPosLong) {
-        return discoveredStructures.getOrDefault(player, new HashMap<>())
-                .getOrDefault(questId, new HashSet<>())
-                .contains(chunkPosLong);
+    /**
+     * Marks a quest as claimed for a player.
+     *
+     * @param player The player UUID.
+     * @param questId The quest ID.
+     */
+    public void setClaimed(UUID player, String questId) {
+        setClaimed(player, questId, true);
     }
 
-    public void addDiscoveredStructure(UUID player, String questId, long chunkPosLong) {
-        discoveredStructures
-                .computeIfAbsent(player, k -> new HashMap<>())
+    /**
+     * Checks if a player has already discovered a structure instance by chunk coordinate.
+     *
+     * @param player The player UUID.
+     * @param questId The quest ID.
+     * @param structureChunkLong The chunk coordinates as a packed long.
+     * @return {@code true} if discovered; {@code false} otherwise.
+     */
+    public boolean hasDiscoveredStructure(UUID player, String questId, long structureChunkLong) {
+        return discoveredStructures.getOrDefault(player, new HashMap<>())
+                .getOrDefault(questId, new HashSet<>())
+                .contains(structureChunkLong);
+    }
+
+    /**
+     * Adds a structure instance chunk coordinate to the player's discovered set.
+     *
+     * @param player The player UUID.
+     * @param questId The quest ID.
+     * @param structureChunkLong The chunk coordinates as a packed long.
+     */
+    public void addDiscoveredStructure(UUID player, String questId, long structureChunkLong) {
+        discoveredStructures.computeIfAbsent(player, k -> new HashMap<>())
                 .computeIfAbsent(questId, k -> new HashSet<>())
-                .add(chunkPosLong);
+                .add(structureChunkLong);
         this.setDirty();
     }
 
-    // 1. Define the Codec
+    /**
+     * Deletes all progress, claims, and discovery tracking for a deleted quest across all players.
+     *
+     * @param questId The quest ID to purge.
+     */
+    public void deleteQuest(String questId) {
+        progress.values().forEach(map -> map.remove(questId));
+        claimed.values().forEach(map -> map.remove(questId));
+        discoveredStructures.values().forEach(map -> map.remove(questId));
+        this.setDirty();
+    }
+
+    /**
+     * Mojang Codec definition for serializing and deserializing QuestState to/from NBT/Dat.
+     */
     public static final Codec<QuestState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            // Serialize the progress map
             Codec.unboundedMap(Codec.STRING, Codec.unboundedMap(Codec.STRING, Codec.INT))
-                    .fieldOf("progress").forGetter(QuestState::getProgressMapAsString),
-
-            // Serialize the claimed rewards map
+                    .xmap(
+                            map -> {
+                                Map<UUID, Map<String, Integer>> result = new HashMap<>();
+                                map.forEach((k, v) -> result.put(UUID.fromString(k), new HashMap<>(v)));
+                                return result;
+                            },
+                            map -> {
+                                Map<String, Map<String, Integer>> result = new HashMap<>();
+                                map.forEach((k, v) -> result.put(k.toString(), v));
+                                return result;
+                            }
+                    ).fieldOf("progress").forGetter(state -> state.progress),
             Codec.unboundedMap(Codec.STRING, Codec.unboundedMap(Codec.STRING, Codec.BOOL))
-                    .fieldOf("claimed").forGetter(QuestState::getClaimedMapAsString),
-
-            // Serialize the discovered structures map
-            // We use optionalFieldOf to prevent crashing when loading old saves that don't have this data yet
+                    .xmap(
+                            map -> {
+                                Map<UUID, Map<String, Boolean>> result = new HashMap<>();
+                                map.forEach((k, v) -> result.put(UUID.fromString(k), new HashMap<>(v)));
+                                return result;
+                            },
+                            map -> {
+                                Map<String, Map<String, Boolean>> result = new HashMap<>();
+                                map.forEach((k, v) -> result.put(k.toString(), v));
+                                return result;
+                            }
+                    ).fieldOf("claimed").forGetter(state -> state.claimed),
             Codec.unboundedMap(Codec.STRING, Codec.unboundedMap(Codec.STRING, Codec.list(Codec.LONG)))
-                    .optionalFieldOf("discovered_structures", new HashMap<>()).forGetter(QuestState::getDiscoveredStructuresMapAsString)
-
-    ).apply(instance, QuestState::createFromMaps));
-
-    // 2. Helper methods to convert UUIDs and Sets to Strings/Lists for the Codec
-    private Map<String, Map<String, Integer>> getProgressMapAsString() {
-        Map<String, Map<String, Integer>> result = new HashMap<>();
-        this.progress.forEach((uuid, map) -> result.put(uuid.toString(), map));
-        return result;
-    }
-
-    private Map<String, Map<String, Boolean>> getClaimedMapAsString() {
-        Map<String, Map<String, Boolean>> result = new HashMap<>();
-        this.claimed.forEach((uuid, map) -> result.put(uuid.toString(), map));
-        return result;
-    }
-
-    private Map<String, Map<String, List<Long>>> getDiscoveredStructuresMapAsString() {
-        Map<String, Map<String, List<Long>>> result = new HashMap<>();
-        this.discoveredStructures.forEach((uuid, map) -> {
-            Map<String, List<Long>> listMap = new HashMap<>();
-            // Codec handles Lists better than Sets, so we convert them for saving
-            map.forEach((questId, set) -> listMap.put(questId, new ArrayList<>(set)));
-            result.put(uuid.toString(), listMap);
-        });
-        return result;
-    }
-
-    // Updated factory method to include the third map
-    private static QuestState createFromMaps(
-            Map<String, Map<String, Integer>> progressMap,
-            Map<String, Map<String, Boolean>> claimedMap,
-            Map<String, Map<String, List<Long>>> discoveredMap) {
-
+                    .xmap(
+                            map -> {
+                                Map<UUID, Map<String, Set<Long>>> result = new HashMap<>();
+                                map.forEach((k, v) -> {
+                                    Map<String, Set<Long>> questMap = new HashMap<>();
+                                    v.forEach((qId, list) -> questMap.put(qId, new HashSet<>(list)));
+                                    result.put(UUID.fromString(k), questMap);
+                                });
+                                return result;
+                            },
+                            map -> {
+                                Map<String, Map<String, List<Long>>> result = new HashMap<>();
+                                map.forEach((k, v) -> {
+                                    Map<String, List<Long>> questMap = new HashMap<>();
+                                    v.forEach((qId, set) -> questMap.put(qId, new ArrayList<>(set)));
+                                    result.put(k.toString(), questMap);
+                                });
+                                return result;
+                            }
+                    ).optionalFieldOf("discoveredStructures", new HashMap<>()).forGetter(state -> state.discoveredStructures)
+    ).apply(instance, (prog, claim, disc) -> {
         QuestState state = new QuestState();
-        progressMap.forEach((uuid, map) -> state.progress.put(UUID.fromString(uuid), new HashMap<>(map)));
-        claimedMap.forEach((uuid, map) -> state.claimed.put(UUID.fromString(uuid), new HashMap<>(map)));
-
-        // Convert the Lists back to Sets for runtime memory efficiency
-        discoveredMap.forEach((uuid, map) -> {
-            Map<String, Set<Long>> setMap = new HashMap<>();
-            map.forEach((questId, list) -> setMap.put(questId, new HashSet<>(list)));
-            state.discoveredStructures.put(UUID.fromString(uuid), setMap);
-        });
-
+        state.progress.putAll(prog);
+        state.claimed.putAll(claim);
+        state.discoveredStructures.putAll(disc);
         return state;
-    }
+    }));
 
-    // 3. Global accessor for server state
-    private static final SavedDataType<QuestState> TYPE = new SavedDataType<>(
-            "pacpackquests_data", // ID of the save file
-            QuestState::new,      // Factory method
-            QuestState.CODEC,     // Our custom Codec
-            DataFixTypes.ADVANCEMENTS
+    /**
+     * SavedDataType registration for the Minecraft Server data storage.
+     */
+    public static final SavedDataType<QuestState> TYPE = new SavedDataType<>(
+            "pacpackquests_data",
+            QuestState::new,
+            CODEC,
+            DataFixTypes.SAVED_DATA_MAP_DATA
     );
 
+    /**
+     * Retrieves the persistent {@link QuestState} instance from the server's overworld data storage.
+     *
+     * @param server The {@link MinecraftServer}.
+     * @return The loaded or newly created {@link QuestState}.
+     */
     public static QuestState getServerState(MinecraftServer server) {
-        return Objects.requireNonNull(server.overworld()).getDataStorage().computeIfAbsent(TYPE);
+        return server.overworld().getDataStorage().computeIfAbsent(TYPE);
     }
 }

@@ -13,6 +13,12 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 
+/**
+ * A quest reward that grants item stacks (direct items, items with NBT/components, or random items from a tag).
+ *
+ * @param target The item identifier string, SNBT command string, or item tag (prefixed with #).
+ * @param amount The number of items to grant.
+ */
 public record ItemReward(String target, int amount) implements QuestReward {
 
     @Override
@@ -54,17 +60,37 @@ public record ItemReward(String target, int amount) implements QuestReward {
 
     @Override
     public ItemStack createIconStack(HolderLookup.Provider registries) {
-        if (target == null || target.isEmpty()) return ItemStack.EMPTY;
-        return ItemUtils.fromCommandString(target, registries);
+        if (target != null && !target.isEmpty()) {
+            if (target.startsWith("#")) {
+                Identifier tagId = Identifier.tryParse(target.substring(1));
+                if (tagId != null) {
+                    List<Item> items = TagUtils.getAllItemsInTag(tagId);
+                    if (!items.isEmpty()) {
+                        long cycle = System.currentTimeMillis() / 1500;
+                        int index = (int) (cycle % items.size());
+                        return new ItemStack(items.get(index), amount);
+                    }
+                }
+            } else {
+                return ItemUtils.fromCommandString(target, registries);
+            }
+        }
+        return ItemStack.EMPTY;
     }
 
     @Override
     public void write(FriendlyByteBuf buf) {
         buf.writeEnum(RewardType.ITEM);
-        buf.writeUtf(target != null ? target : "");
-        buf.writeInt(amount);
+        buf.writeUtf(this.target != null ? this.target : "");
+        buf.writeInt(this.amount);
     }
 
+    /**
+     * Reads an {@link ItemReward} from the network buffer.
+     *
+     * @param buf The buffer to read from.
+     * @return The read {@link ItemReward}.
+     */
     public static ItemReward read(FriendlyByteBuf buf) {
         return new ItemReward(buf.readUtf(), buf.readInt());
     }
