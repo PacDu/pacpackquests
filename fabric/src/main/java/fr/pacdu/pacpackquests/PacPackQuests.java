@@ -14,7 +14,7 @@ public class PacPackQuests implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		Constants.LOG.info("Initializing PacPack Quests (Fabric)...");
+		Constants.LOG.info("Initializing PacPack Quests...");
 
 		ModConfig.load();
 		ServerLifecycleEvents.SERVER_STARTING.register(QuestManager::loadQuests);

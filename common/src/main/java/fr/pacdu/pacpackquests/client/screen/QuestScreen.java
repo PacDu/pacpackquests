@@ -25,6 +25,7 @@ import net.minecraft.ChatFormatting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -500,7 +501,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		MutableComponent rewardLabel = Component.translatable("gui.pacpackquests.reward").append(": ").withStyle(ChatFormatting.GRAY);
 		tooltip.add(rewardLabel.append(TranslationUtils.getRewardText(quest.definition().primaryReward(), claimed)));
 
-		context.setTooltipForNextFrame(this.font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+		context.setTooltipForNextFrame(this.font, tooltip, Optional.empty(), mouseX, mouseY);
 	}
 
 	private QuestNode getQuestById(String id) {

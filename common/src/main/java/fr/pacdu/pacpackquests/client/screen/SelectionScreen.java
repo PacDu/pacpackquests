@@ -30,10 +30,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 import java.util.function.Consumer;
 
 /**
@@ -418,7 +415,7 @@ public class SelectionScreen extends Screen {
             // JEI mod name line in Blue Italic
             tooltip.add(Component.literal(hoveredEntry.modName).withStyle(ChatFormatting.BLUE, ChatFormatting.ITALIC));
 
-            context.setTooltipForNextFrame(this.font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            context.setTooltipForNextFrame(this.font, tooltip, Optional.empty(), mouseX, mouseY);
         }
 
         // Scrollbar Render
