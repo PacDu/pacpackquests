@@ -9,7 +9,12 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.minecraft.world.level.saveddata.SavedDataType;
+import fr.pacdu.pacpackquests.Constants;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
@@ -207,14 +212,25 @@ public class QuestState extends SavedData {
         state.discoveredStructures.putAll(disc);
         return state;
     }));
+    @Override
+    public @NotNull CompoundTag save(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider provider) {
+        Tag encoded = CODEC.encodeStart(NbtOps.INSTANCE, this).resultOrPartial(Constants.LOG::error).orElse(new CompoundTag());
+        if (encoded instanceof CompoundTag compound) {
+            tag.merge(compound);
+        }
+        return tag;
+    }
+
+    public static QuestState load(CompoundTag tag, HolderLookup.Provider provider) {
+        return CODEC.parse(NbtOps.INSTANCE, tag).resultOrPartial(Constants.LOG::error).orElseGet(QuestState::new);
+    }
 
     /**
-     * SavedDataType registration for the Minecraft Server data storage.
+     * SavedData.Factory registration for the Minecraft Server data storage.
      */
-    public static final SavedDataType<QuestState> TYPE = new SavedDataType<>(
-            "pacpackquests_data",
+    public static final SavedData.Factory<QuestState> FACTORY = new SavedData.Factory<>(
             QuestState::new,
-            CODEC,
+            QuestState::load,
             DataFixTypes.SAVED_DATA_MAP_DATA
     );
 
@@ -225,6 +241,6 @@ public class QuestState extends SavedData {
      * @return The loaded or newly created {@link QuestState}.
      */
     public static QuestState getServerState(MinecraftServer server) {
-        return server.overworld().getDataStorage().computeIfAbsent(TYPE);
+        return server.overworld().getDataStorage().computeIfAbsent(FACTORY, "pacpackquests_data");
     }
 }

@@ -7,9 +7,8 @@ import net.minecraft.client.gui.components.CommandSuggestions;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.function.BiConsumer;
 
@@ -67,7 +66,7 @@ public class EditCommandScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float deltaTicks) {
+    public void render(@NotNull GuiGraphics context, int mouseX, int mouseY, float deltaTicks) {
         super.render(context, mouseX, mouseY, deltaTicks);
         context.drawCenteredString(this.font, this.title, this.width / 2, 15, 0xFFFFFFFF);
 
@@ -82,19 +81,19 @@ public class EditCommandScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyEvent input) {
-        if (this.commandField.isFocused() && this.commandSuggestor.keyPressed(input)) {
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (this.commandField.isFocused() && this.commandSuggestor.keyPressed(keyCode, scanCode, modifiers)) {
             return true;
         }
-        return super.keyPressed(input);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
-        if (this.commandField.isFocused() && this.commandSuggestor.mouseClicked(click)) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (this.commandField.isFocused() && this.commandSuggestor.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
-        return super.mouseClicked(click, doubled);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override

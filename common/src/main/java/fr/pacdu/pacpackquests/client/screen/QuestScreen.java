@@ -7,16 +7,13 @@ import fr.pacdu.pacpackquests.network.*;
 import fr.pacdu.pacpackquests.client.util.TranslationUtils;
 import fr.pacdu.pacpackquests.platform.Services;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import fr.pacdu.pacpackquests.client.gui.ScrollbarWidget;
 import fr.pacdu.pacpackquests.util.PathSecurity;
-import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.resources.language.I18n;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Component;
@@ -99,7 +96,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		this.addRenderableWidget(this.claimAllButton);
 
 		// "Edit Mode" Toggle Button (Only visible if player is OP)
-		if (Minecraft.getInstance().player != null && Minecraft.getInstance().player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+		if (Minecraft.getInstance().player != null && Minecraft.getInstance().player.hasPermissions(2)) {
 			this.addRenderableWidget(
 					Button.builder(Component.literal(I18n.get("gui.pacpackquests.edit") + ": " + (isEditMode ? "ON" : "OFF")).withStyle(isEditMode ? ChatFormatting.GREEN : ChatFormatting.RED), button -> {
 								this.isEditMode = !this.isEditMode;
@@ -222,7 +219,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 		context.enableScissor(tabX - 40, startY + categMarginTop, startX, startY + windowHeight - categMarginBottom);
 		
-		context.pose().translate(0.0f, (float) -scrollAmount);
+		context.pose().translate(0.0f, (float) -scrollAmount, 0.0f);
 
 		String hoveredTruncatedCategory = null;
 		int maxTextWidth = tabWidth - 8;
@@ -308,7 +305,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			}
 		}
 
-		context.pose().translate(0.0f, (float) scrollAmount);
+		context.pose().translate(0.0f, (float) scrollAmount, 0.0f);
 		context.disableScissor();
 
 		// --- CATEGORY SCROLLBAR ---
@@ -325,9 +322,9 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 		context.enableScissor(startX, startY, startX + windowWidth, startY + windowHeight);
 
-		context.pose().pushMatrix();
-		context.pose().translate((float) (startX + panX), (float) (startY + panY));
-		context.pose().scale(zoom, zoom);
+		context.pose().pushPose();
+		context.pose().translate((float) (startX + panX), (float) (startY + panY), 0.0f);
+		context.pose().scale(zoom, zoom, 1.0f);
 
 		// Draw Helper Grid in Edit Mode
 		if (isEditMode) {
@@ -410,7 +407,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			renderNode(context, movingNode, localMouseX, localMouseY, false);
 		}
 
-		context.pose().popMatrix();
+		context.pose().popPose();
 
 		// --- DRAW TOOLTIP ---
 		if (hoveredNode != null && !isEditMode) { // Tooltips can get in the way during editing
@@ -421,16 +418,16 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			editTooltip.add(Component.translatable("gui.pacpackquests.click_drag").withStyle(ChatFormatting.GRAY).append(" ").append(Component.translatable("gui.pacpackquests.to_move").withStyle(ChatFormatting.WHITE)));
 			editTooltip.add(Component.translatable("gui.pacpackquests.right_click").withStyle(ChatFormatting.GRAY).append(" ").append(Component.translatable("gui.pacpackquests.to_edit_delete").withStyle(ChatFormatting.WHITE)));
 			editTooltip.add(Component.translatable("gui.pacpackquests.middle_click").withStyle(ChatFormatting.GRAY).append(" ").append(Component.translatable("gui.pacpackquests.to_duplicate").withStyle(ChatFormatting.WHITE)));
-			context.setTooltipForNextFrame(this.font, editTooltip, java.util.Optional.empty(), mouseX, mouseY);
+			context.renderComponentTooltip(this.font, editTooltip, mouseX, mouseY);
 		} else if (hoveredDotX >= 0 && hoveredDotY >= 0 && isEditMode) {
 			List<Component> editTooltip = new ArrayList<>();
 			editTooltip.add(Component.translatable("gui.pacpackquests.edit_action").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD));
 			editTooltip.add(Component.translatable("gui.pacpackquests.right_click").withStyle(ChatFormatting.GRAY).append(" ").append(Component.translatable("gui.pacpackquests.to_add").withStyle(ChatFormatting.WHITE)));
-			context.setTooltipForNextFrame(this.font, editTooltip, java.util.Optional.empty(), mouseX, mouseY);
+			context.renderComponentTooltip(this.font, editTooltip, mouseX, mouseY);
 		}
 
 		if (hoveredTruncatedCategory != null && draggedQuestId == null && draggedCategory == null) {
-			context.setTooltipForNextFrame(this.font, Component.literal(hoveredTruncatedCategory), mouseX, mouseY);
+			context.renderTooltip(this.font, Component.literal(hoveredTruncatedCategory), mouseX, mouseY);
 		}
 	}
 
@@ -501,7 +498,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		MutableComponent rewardLabel = Component.translatable("gui.pacpackquests.reward").append(": ").withStyle(ChatFormatting.GRAY);
 		tooltip.add(rewardLabel.append(TranslationUtils.getRewardText(quest.definition().primaryReward(), claimed)));
 
-		context.setTooltipForNextFrame(this.font, tooltip, Optional.empty(), mouseX, mouseY);
+		context.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
 	}
 
 	private QuestNode getQuestById(String id) {
@@ -512,16 +509,15 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	}
 
 	@Override
-	public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
+	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (draggedQuestId != null) return true;
 
-		double mouseX = click.x();
-		double mouseY = click.y();
+		
 		double localMouseX = (mouseX - startX - panX) / zoom;
 		double localMouseY = (mouseY - startY - panY) / zoom;
-		boolean isMouseInWindow = isMouseInWindow(click.x(), click.y());
+		boolean isMouseInWindow = isMouseInWindow(mouseX, mouseY);
 
-		if (click.button() == 0) { // Left Click
+		if (button == 0) { // Left Click
 			if (categoryScrollbar.mouseClicked(mouseX, mouseY, 0)) {
 				if (this.inlineCategoryField.isVisible()) {
 					this.inlineCategoryField.setVisible(false);
@@ -610,14 +606,14 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 		// Edit Mode Logic (Node interaction)
 		if (isEditMode && isMouseInWindow) {
-			if (click.button() == 0 && draggedQuestId == null) { // Left Click: Pick up node to drag
+			if (button == 0 && draggedQuestId == null) { // Left Click: Pick up node to drag
 				for (QuestNode quest : questList) {
 					if (isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
 						draggedQuestId = quest.id();
 						return true; // Consume event to prevent panning
 					}
 				}
-			} else if (click.button() == 1) { // Right Click: Open Edit/Delete Menu
+			} else if (button == 1) { // Right Click: Open Edit/Delete Menu
 				for (QuestNode quest : questList) {
 					if (isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
 						// Edit existing quest
@@ -636,7 +632,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 					Minecraft.getInstance().setScreen(new EditQuestScreen(this, null, selectedCategory, gridX, gridY));
 					return true;
 				}
-			} else if (click.button() == 2) { // Middle Click: Duplicate Quest
+			} else if (button == 2) { // Middle Click: Duplicate Quest
 				for (QuestNode quest : questList) {
 					if (isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
 						int suffix = 0;
@@ -662,7 +658,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		}
 
 		// Normal Interaction logic (Claiming)
-		if (!isEditMode && click.button() == 0) {
+		if (!isEditMode && button == 0) {
 			if (isMouseInWindow) {
 				for (QuestNode quest : questList) {
 					if (isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
@@ -680,12 +676,12 @@ public class QuestScreen extends AbstractQuestGridScreen {
 				}
 			}
 		}
-		return super.mouseClicked(click, doubled);
+		return super.mouseClicked(mouseX, mouseY, button);
 	}
 
 	@Override
-	public boolean mouseDragged(MouseButtonEvent click, double offsetX, double offsetY) {
-		if (categoryScrollbar.mouseDragged(click.x(), click.y(), click.button(), offsetX, offsetY)) {
+	public boolean mouseDragged(double mouseX, double mouseY, int button, double offsetX, double offsetY) {
+		if (categoryScrollbar.mouseDragged(mouseX, mouseY, button, offsetX, offsetY)) {
 			if (this.inlineCategoryField != null && this.inlineCategoryField.isVisible()) {
 				this.inlineCategoryField.setVisible(false);
 				this.categoryEditTarget = null;
@@ -699,23 +695,23 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		}
 
 		// If holding a node, do NOT pan the camera
-		if (isEditMode && draggedQuestId != null && click.button() == 0) {
+		if (isEditMode && draggedQuestId != null && button == 0) {
 			return true;
 		}
 
-		return super.mouseDragged(click, offsetX, offsetY);
+		return super.mouseDragged(mouseX, mouseY, button, offsetX, offsetY);
 	}
 
 	@Override
-	public boolean mouseReleased(MouseButtonEvent click) {
-		if (categoryScrollbar.mouseReleased(click.x(), click.y(), click.button())) {
+	public boolean mouseReleased(double mouseX, double mouseY, int button) {
+		if (categoryScrollbar.mouseReleased(mouseX, mouseY, button)) {
 			return true;
 		}
 		
 		categoryClickTarget = null; // Reset click target
 
-		if (isEditMode && draggedCategory != null && click.button() == 0) {
-			int dropIndex = Math.clamp((int) Math.round((click.y() + categoryScrollbar.getScrollAmount() - (startY + 20.0)) / (tabHeight + 5.0)), 0, CLIENT_CATEGORIES.size());
+		if (isEditMode && draggedCategory != null && button == 0) {
+			int dropIndex = Math.clamp((int) Math.round((mouseY + categoryScrollbar.getScrollAmount() - (startY + 20.0)) / (tabHeight + 5.0)), 0, CLIENT_CATEGORIES.size());
 			CLIENT_CATEGORIES.remove(draggedCategory);
 
 			// Using Math.clamp after subtraction prevents OutOfBounds errors
@@ -729,9 +725,9 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			return true;
 		}
 
-		if (isEditMode && draggedQuestId != null && click.button() == 0) {
-			double localMouseX = (click.x() - startX - panX) / zoom;
-			double localMouseY = (click.y() - startY - panY) / zoom;
+		if (isEditMode && draggedQuestId != null && button == 0) {
+			double localMouseX = (mouseX - startX - panX) / zoom;
+			double localMouseY = (mouseY - startY - panY) / zoom;
 
 			// Reverse math to find the closest grid X and Y
 			int dropGridX = Math.round(((float) localMouseX - canvasOffsetX) / gridSpacing);
@@ -757,7 +753,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 				}
 
 				// Fallback to the original coordinates if the area is completely full or mouse is out of window
-				if (!foundSpot || !isMouseInWindow(click.x(), click.y())) {
+				if (!foundSpot || !isMouseInWindow(mouseX, mouseY)) {
 					if (duplicatedQuest != null) return true;
 					finalX = oldDef.displayX();
 					finalY = oldDef.displayY();
@@ -783,7 +779,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			refreshQuests();
 			return true;
 		}
-		return super.mouseReleased(click);
+		return super.mouseReleased(mouseX, mouseY, button);
 	}
 
 	@Override
@@ -802,9 +798,9 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	}
 
 	@Override
-	public boolean keyPressed(KeyEvent input) {
+	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
 		if (this.inlineCategoryField.isVisible() && this.inlineCategoryField.isFocused()) {
-			if (input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER || input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
+			if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER || keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
 				String newName = this.inlineCategoryField.getValue().trim().toLowerCase(Locale.ROOT).replace(" ", "_");
 				if (PathSecurity.isValidIdentifier(newName) && categoryEditTarget == null) {
 					if (!CLIENT_CATEGORIES.contains(newName)) {
@@ -819,28 +815,28 @@ public class QuestScreen extends AbstractQuestGridScreen {
 				categoryEditTarget = null;
 				return true;
 			}
-			else if (input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+			else if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
 				this.inlineCategoryField.setVisible(false);
 				this.inlineCategoryField.setValue("");
 				categoryEditTarget = null;
 				return true;
 			}
-			return super.keyPressed(input);
+			return super.keyPressed(keyCode, scanCode, modifiers);
 		}
 
 		if (duplicatedQuest != null) {
-			if (input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE)  {
+			if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE)  {
 				duplicatedQuest = null;
 				draggedQuestId = null;
 				return true;
 			}
 		}
 
-		if (ClientQuestData.openQuestMenuKey != null && ClientQuestData.openQuestMenuKey.matches(input)) {
+		if (ClientQuestData.openQuestMenuKey != null && ClientQuestData.openQuestMenuKey.matches(keyCode, scanCode)) {
 			this.onClose();
 			return true;
 		}
-		return super.keyPressed(input);
+		return super.keyPressed(keyCode, scanCode, modifiers);
 	}
 
 	private GridPos searchNearestEmptySlot(int dropGridX, int dropGridY) {

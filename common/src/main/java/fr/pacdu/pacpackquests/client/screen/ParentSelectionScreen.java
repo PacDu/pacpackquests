@@ -8,10 +8,10 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -129,9 +129,9 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
-        if (click.button() == 0) {
-            double mouseX = click.x(); double mouseY = click.y(); double localMouseX = (mouseX - startX - panX) / zoom;
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0) {
+            double localMouseX = (mouseX - startX - panX) / zoom;
             double localMouseY = (mouseY - startY - panY) / zoom;
             boolean isMouseInWindow = mouseX >= startX && mouseX <= startX + windowWidth && mouseY >= startY && mouseY <= startY + windowHeight;
 
@@ -151,11 +151,11 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
                 }
             }
         }
-        return super.mouseClicked(click, doubled);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void render(@NotNull GuiGraphics context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
 
         // Share the background framing logic with QuestScreen
@@ -178,9 +178,9 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
         context.drawCenteredString(this.font, Component.literal(displayCat), tabX + tabWidth / 2, tabY + 6, 0xFFFFFFFF);
 
         context.enableScissor(startX, startY, startX + windowWidth, startY + windowHeight);
-        context.pose().pushMatrix();
-        context.pose().translate((float) (startX + panX), (float) (startY + panY));
-        context.pose().scale(zoom, zoom);
+        context.pose().pushPose();
+        context.pose().translate((float) (startX + panX), (float) (startY + panY), 0.0f);
+        context.pose().scale(zoom, zoom, 1.0f);
 
         // Draw connections between nodes using the abstract class logic
         for (SelectionNode node : nodes) {
@@ -218,7 +218,7 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
             }
         }
 
-        context.pose().popMatrix();
+        context.pose().popPose();
         context.disableScissor();
 
         // Tooltip for hovering
@@ -231,9 +231,9 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
             } else if (this.invalidDescendants.contains(hoveredNode.id())) {
                 tooltip.add(Component.translatable("gui.pacpackquests.cannot_select_child").withStyle(ChatFormatting.RED));
             }
-            context.setTooltipForNextFrame(this.font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            context.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
         } else if (isTruncated && mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= tabY && mouseY <= tabY + tabHeight) {
-            context.setTooltipForNextFrame(this.font, Component.literal(fullCat), mouseX, mouseY);
+            context.renderTooltip(this.font, Component.literal(fullCat), mouseX, mouseY);
         }
     }
 

@@ -18,6 +18,10 @@ public class DrawUtils {
     public static void drawCheckmark(GuiGraphics context, int x, int y, int size) {
         if (size <= 0) return;
 
+        // Brings it to the foreground
+        context.pose().pushPose();
+        context.pose().translate(0.0f, 0.0f, 200.0f);
+
         // 1. Compute dimensions and bottom vertex coordinates (xv, yv)
         int margin = size <= 6 ? 0 : 1;
         int totalW = Math.max(2, size - 1 - 2 * margin);
@@ -49,5 +53,7 @@ public class DrawUtils {
                 }
             }
         }
+
+        context.pose().popPose();
     }
 }

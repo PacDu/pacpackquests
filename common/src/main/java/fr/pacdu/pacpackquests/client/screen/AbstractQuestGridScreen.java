@@ -3,7 +3,6 @@ package fr.pacdu.pacpackquests.client.screen;
 import com.mojang.math.Axis;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 
@@ -67,16 +66,16 @@ public abstract class AbstractQuestGridScreen extends Screen {
 
     // --- INPUT HANDLING FOR PAN & ZOOM ---
     @Override
-    public boolean mouseDragged(MouseButtonEvent click, double deltaX, double deltaY) {
-        // If left click and we are hovering the canvas, we pan.
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        // If left click, and we are hovering the canvas, we pan.
         // Child classes can intercept this beforehand if they want dragging nodes instead.
-        if (click.x() >= startX && click.x() <= startX + windowWidth && click.y() >= startY && click.y() <= startY + windowHeight) {
+        if (mouseX >= startX && mouseX <= startX + windowWidth && mouseY >= startY && mouseY <= startY + windowHeight) {
             panX += deltaX;
             panY += deltaY;
             clampPanning();
             return true;
         }
-        return super.mouseDragged(click, deltaX, deltaY);
+        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
     }
 
     protected boolean forceFullGridBounds() {
@@ -296,14 +295,14 @@ public abstract class AbstractQuestGridScreen extends Screen {
         float length = (float) Math.sqrt(dx * dx + dy * dy);
         float angle = (float) Math.atan2(dy, dx);
 
-        context.pose().pushMatrix();
-        context.pose().translate((float) px, (float) py);
-        context.pose().rotate(angle);
+        context.pose().pushPose();
+        context.pose().translate((float) px, (float) py, 0.0f);
+        context.pose().mulPose(Axis.ZP.rotation(angle));
 
         context.fill(0, -thickness / 2, (int) length, thickness / 2, lineColor);
         drawArrowChevron(context, (int) (length / 2) + 4, arrowColor);
 
-        context.pose().popMatrix();
+        context.pose().popPose();
     }
 
     private void drawArrowChevron(GuiGraphics context, int x, int color) {

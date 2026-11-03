@@ -12,7 +12,8 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,7 +33,7 @@ public record SaveQuestPayload(
         List<QuestReward> rewards
 ) implements CustomPacketPayload {
 
-    public static final Type<SaveQuestPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(Constants.MOD_ID, "save_quest"));
+    public static final Type<SaveQuestPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(Constants.MOD_ID, "save_quest"));
 
     public SaveQuestPayload(QuestDefinition quest, HolderLookup.Provider registries) {
         this(
@@ -82,7 +83,7 @@ public record SaveQuestPayload(
     }
 
     @Override
-    public Type<? extends CustomPacketPayload> type() {
+    public @NotNull Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
 }

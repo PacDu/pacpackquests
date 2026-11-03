@@ -7,7 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -52,7 +52,7 @@ public class IconUtils {
             rawTarget = rawTarget.substring(0, rawTarget.indexOf('['));
         }
 
-        Identifier id = Identifier.tryParse(rawTarget);
+        ResourceLocation id = ResourceLocation.tryParse(rawTarget);
 
         if (id == null) return getDefaultFallback(type).getDefaultInstance();
 
@@ -63,21 +63,21 @@ public class IconUtils {
             }
             case BLOCK -> {
                 if (isTag) return TagUtils.getFirstBlockInTag(id).asItem().getDefaultInstance();
-                Item blockItem = BuiltInRegistries.BLOCK.getValue(id).asItem();
+                Item blockItem = BuiltInRegistries.BLOCK.get(id).asItem();
                 return blockItem != Items.AIR ? blockItem.getDefaultInstance() : Items.BARRIER.getDefaultInstance();
             }
             case MOB -> {
                 if (id.toString().equals("minecraft:player")) return Items.PLAYER_HEAD.getDefaultInstance();
 
-                Identifier eggId;
+                ResourceLocation eggId;
                 if (isTag) {
-                    Identifier firstEntityId = BuiltInRegistries.ENTITY_TYPE.getKey(TagUtils.getFirstEntityTypeInTag(id));
-                    eggId = Identifier.fromNamespaceAndPath(firstEntityId.getNamespace(), firstEntityId.getPath() + "_spawn_egg");
+                    ResourceLocation firstEntityId = BuiltInRegistries.ENTITY_TYPE.getKey(TagUtils.getFirstEntityTypeInTag(id));
+                    eggId = ResourceLocation.fromNamespaceAndPath(firstEntityId.getNamespace(), firstEntityId.getPath() + "_spawn_egg");
                 } else {
-                    eggId = Identifier.fromNamespaceAndPath(id.getNamespace(), id.getPath() + "_spawn_egg");
+                    eggId = ResourceLocation.fromNamespaceAndPath(id.getNamespace(), id.getPath() + "_spawn_egg");
                 }
 
-                if (BuiltInRegistries.ITEM.containsKey(eggId)) return BuiltInRegistries.ITEM.getValue(eggId).getDefaultInstance();
+                if (BuiltInRegistries.ITEM.containsKey(eggId)) return BuiltInRegistries.ITEM.get(eggId).getDefaultInstance();
                 return Items.SPAWNER.getDefaultInstance();
             }
             default -> {}
@@ -108,12 +108,12 @@ public class IconUtils {
         Item bestMatch = null;
 
         if (!keywords.isEmpty()) {
-            for (Identifier itemId : BuiltInRegistries.ITEM.keySet()) {
+            for (ResourceLocation itemId : BuiltInRegistries.ITEM.keySet()) {
                 if (itemId.getNamespace().equals(searchNamespace)) {
                     String itemPath = itemId.getPath();
                     for (String kw : keywords) {
                         if (itemPath.contains(kw)) {
-                            Item item = BuiltInRegistries.ITEM.getValue(itemId);
+                            Item item = BuiltInRegistries.ITEM.get(itemId);
                             if (item instanceof BlockItem) return item.getDefaultInstance();
                             if (bestMatch == null) bestMatch = item;
                         }

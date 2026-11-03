@@ -14,7 +14,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -82,7 +82,7 @@ public class TranslationUtils {
         boolean isComplexItem = entryId.contains("[");
         String rawId = isTag ? entryId.substring(1) : entryId;
         rawId = isComplexItem ? rawId.substring(0, entryId.indexOf('[')) : rawId;
-        Identifier id = Identifier.tryParse(rawId);
+        ResourceLocation id = ResourceLocation.tryParse(rawId);
 
         if (id == null) return entryId;
 
@@ -110,10 +110,10 @@ public class TranslationUtils {
                         yield stack.getHoverName().getString();
                     }
                 }
-                yield BuiltInRegistries.ITEM.getValue(id).getName().getString();
+                yield BuiltInRegistries.ITEM.get(id).getDescription().getString();
             }
-            case BLOCK -> BuiltInRegistries.BLOCK.getValue(id).getName().getString();
-            case MOB -> BuiltInRegistries.ENTITY_TYPE.getValue(id).getDescription().getString();
+            case BLOCK -> BuiltInRegistries.BLOCK.get(id).getName().getString();
+            case MOB -> BuiltInRegistries.ENTITY_TYPE.get(id).getDescription().getString();
             case COMMAND -> {
                 String command = (entryId.startsWith("/") ? "" : "/") + entryId;
                 if (command.length() > 24) {
@@ -134,7 +134,7 @@ public class TranslationUtils {
         boolean isTag = raw.startsWith("#");
         String clean = isTag ? raw.substring(1) : raw;
         if (clean.contains("[")) clean = clean.substring(0, clean.indexOf('['));
-        Identifier id = Identifier.tryParse(clean);
+        ResourceLocation id = ResourceLocation.tryParse(clean);
         if (id == null) return raw;
 
         String path = id.getPath();
@@ -153,16 +153,16 @@ public class TranslationUtils {
     /**
      * Returns the number of elements contained in a tag for any given RegistryType.
      */
-    public static int getTagSize(Identifier tagId, RegistryType type) {
+    public static int getTagSize(ResourceLocation tagId, RegistryType type) {
         if (tagId == null || type == null) return -1;
         Minecraft client = Minecraft.getInstance();
 
         return switch (type) {
-            case ITEM -> BuiltInRegistries.ITEM.get(TagKey.create(Registries.ITEM, tagId))
+            case ITEM -> BuiltInRegistries.ITEM.getTag(TagKey.create(Registries.ITEM, tagId))
                     .map(HolderSet.Named::size).orElse(-1);
-            case BLOCK -> BuiltInRegistries.BLOCK.get(TagKey.create(Registries.BLOCK, tagId))
+            case BLOCK -> BuiltInRegistries.BLOCK.getTag(TagKey.create(Registries.BLOCK, tagId))
                     .map(HolderSet.Named::size).orElse(-1);
-            case MOB -> BuiltInRegistries.ENTITY_TYPE.get(TagKey.create(Registries.ENTITY_TYPE, tagId))
+            case MOB -> BuiltInRegistries.ENTITY_TYPE.getTag(TagKey.create(Registries.ENTITY_TYPE, tagId))
                     .map(HolderSet.Named::size).orElse(-1);
             case BIOME -> {
                 if (client != null && client.level != null) {
@@ -183,14 +183,11 @@ public class TranslationUtils {
                 yield -1;
             }
             case LOOT_TABLE -> {
-                if (tagId.equals(Identifier.fromNamespaceAndPath("pacpackquests", "loot_chest"))) {
+                if (tagId.equals(ResourceLocation.fromNamespaceAndPath("pacpackquests", "loot_chest"))) {
                     if (client != null && client.getSingleplayerServer() != null) {
-                        var opt = client.getSingleplayerServer().reloadableRegistries().lookup().lookup(Registries.LOOT_TABLE);
-                        if (opt.isPresent()) {
-                            yield (int) opt.get().listElementIds()
-                                    .filter(key -> key.identifier().getPath().startsWith("chests/"))
-                                    .count();
-                        }
+                        yield (int) client.getSingleplayerServer().reloadableRegistries().getKeys(Registries.LOOT_TABLE).stream()
+                                .filter(key -> key.getPath().startsWith("chests/"))
+                                .count();
                     }
                     yield ClientQuestData.SERVER_LOOT_TABLES.size();
                 }

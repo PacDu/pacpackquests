@@ -6,10 +6,11 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.NotNull;
 
 public record QuestProgressPayload(String questId, int progress, boolean isFinished, boolean isClaimed) implements CustomPacketPayload {
-    public static final Type<QuestProgressPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(Constants.MOD_ID, "quest_progress"));
+    public static final Type<QuestProgressPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(Constants.MOD_ID, "quest_progress"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, QuestProgressPayload> CODEC = StreamCodec.composite(
             ByteBufCodecs.STRING_UTF8, QuestProgressPayload::questId,
@@ -20,7 +21,7 @@ public record QuestProgressPayload(String questId, int progress, boolean isFinis
     );
 
     @Override
-    public Type<? extends CustomPacketPayload> type() {
+    public @NotNull Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
 }

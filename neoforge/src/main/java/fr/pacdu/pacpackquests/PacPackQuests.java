@@ -38,7 +38,7 @@ public class PacPackQuests {
         NeoForgeQuestEventHandler.register();
 
         // Initialize client if on client physical side
-        if (FMLLoader.getCurrent().getDist() == Dist.CLIENT) {
+        if (FMLLoader.getDist() == Dist.CLIENT) {
             PacPackQuestsClient.init(modEventBus);
         }
     }
@@ -85,56 +85,81 @@ public class PacPackQuests {
         registrar.playBidirectional(
                 DeleteQuestPayload.TYPE,
                 DeleteQuestPayload.CODEC,
-                ClientPayloadHandler::handleDeleteQuest,
-                (payload, context) -> context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer sp) {
-                        ServerNetworkHandler.handleDeleteQuest(sp, payload);
+                (payload, context) -> {
+                    if (context.flow() == net.minecraft.network.protocol.PacketFlow.CLIENTBOUND) {
+                        ClientPayloadHandler.handleDeleteQuest(payload, context);
+                    } else {
+                        context.enqueueWork(() -> {
+                            if (context.player() instanceof ServerPlayer sp) {
+                                ServerNetworkHandler.handleDeleteQuest(sp, payload);
+                            }
+                        });
                     }
-                })
+                }
         );
 
         registrar.playBidirectional(
                 CreateCategoryPayload.TYPE,
                 CreateCategoryPayload.CODEC,
-                ClientPayloadHandler::handleCreateCategory,
-                (payload, context) -> context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer sp) {
-                        ServerNetworkHandler.handleCreateCategory(sp, payload);
+                (payload, context) -> {
+                    if (context.flow() == net.minecraft.network.protocol.PacketFlow.CLIENTBOUND) {
+                        ClientPayloadHandler.handleCreateCategory(payload, context);
+                    } else {
+                        context.enqueueWork(() -> {
+                            if (context.player() instanceof ServerPlayer sp) {
+                                ServerNetworkHandler.handleCreateCategory(sp, payload);
+                            }
+                        });
                     }
-                })
+                }
         );
 
         registrar.playBidirectional(
                 DeleteCategoryPayload.TYPE,
                 DeleteCategoryPayload.CODEC,
-                ClientPayloadHandler::handleDeleteCategory,
-                (payload, context) -> context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer sp) {
-                        ServerNetworkHandler.handleDeleteCategory(sp, payload);
+                (payload, context) -> {
+                    if (context.flow() == net.minecraft.network.protocol.PacketFlow.CLIENTBOUND) {
+                        ClientPayloadHandler.handleDeleteCategory(payload, context);
+                    } else {
+                        context.enqueueWork(() -> {
+                            if (context.player() instanceof ServerPlayer sp) {
+                                ServerNetworkHandler.handleDeleteCategory(sp, payload);
+                            }
+                        });
                     }
-                })
+                }
         );
 
         registrar.playBidirectional(
                 ReorderCategoryPayload.TYPE,
                 ReorderCategoryPayload.CODEC,
-                ClientPayloadHandler::handleReorderCategory,
-                (payload, context) -> context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer sp) {
-                        ServerNetworkHandler.handleReorderCategory(sp, payload);
+                (payload, context) -> {
+                    if (context.flow() == net.minecraft.network.protocol.PacketFlow.CLIENTBOUND) {
+                        ClientPayloadHandler.handleReorderCategory(payload, context);
+                    } else {
+                        context.enqueueWork(() -> {
+                            if (context.player() instanceof ServerPlayer sp) {
+                                ServerNetworkHandler.handleReorderCategory(sp, payload);
+                            }
+                        });
                     }
-                })
+                }
         );
 
         registrar.playBidirectional(
                 EditCategoryPayload.TYPE,
                 EditCategoryPayload.CODEC,
-                ClientPayloadHandler::handleEditCategory,
-                (payload, context) -> context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer sp) {
-                        ServerNetworkHandler.handleEditCategory(sp, payload);
+                (payload, context) -> {
+                    if (context.flow() == net.minecraft.network.protocol.PacketFlow.CLIENTBOUND) {
+                        ClientPayloadHandler.handleEditCategory(payload, context);
+                    } else {
+                        context.enqueueWork(() -> {
+                            if (context.player() instanceof ServerPlayer sp) {
+                                ServerNetworkHandler.handleEditCategory(sp, payload);
+                            }
+                        });
                     }
-                })
+                }
         );
     }
 

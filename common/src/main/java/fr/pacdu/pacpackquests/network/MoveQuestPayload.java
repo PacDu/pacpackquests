@@ -6,10 +6,11 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.NotNull;
 
 public record MoveQuestPayload(String questId, int newX, int newY) implements CustomPacketPayload {
-    public static final Type<MoveQuestPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(Constants.MOD_ID, "move_quest"));
+    public static final Type<MoveQuestPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(Constants.MOD_ID, "move_quest"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, MoveQuestPayload> CODEC = StreamCodec.composite(
             ByteBufCodecs.STRING_UTF8, MoveQuestPayload::questId,
@@ -19,5 +20,5 @@ public record MoveQuestPayload(String questId, int newX, int newY) implements Cu
     );
 
     @Override
-    public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    public @NotNull Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

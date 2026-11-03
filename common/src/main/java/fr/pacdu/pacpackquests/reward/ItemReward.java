@@ -6,7 +6,7 @@ import fr.pacdu.pacpackquests.util.TagUtils;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -32,7 +32,7 @@ public record ItemReward(String target, int amount) implements QuestReward {
 
         // Random reward from a tag (e.g. "#minecraft:logs")
         if (target.startsWith("#")) {
-            Identifier tagId = Identifier.tryParse(target.substring(1));
+            ResourceLocation tagId = ResourceLocation.tryParse(target.substring(1));
             if (tagId != null) {
                 List<Item> items = TagUtils.getAllItemsInTag(tagId);
                 if (!items.isEmpty()) {
@@ -62,7 +62,7 @@ public record ItemReward(String target, int amount) implements QuestReward {
     public ItemStack createIconStack(HolderLookup.Provider registries) {
         if (target != null && !target.isEmpty()) {
             if (target.startsWith("#")) {
-                Identifier tagId = Identifier.tryParse(target.substring(1));
+                ResourceLocation tagId = ResourceLocation.tryParse(target.substring(1));
                 if (tagId != null) {
                     List<Item> items = TagUtils.getAllItemsInTag(tagId);
                     if (!items.isEmpty()) {

@@ -10,7 +10,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -44,7 +44,7 @@ public class QuestEventHandler {
                 String target = quest.target();
 
                 if (target.startsWith("#")) {
-                    Identifier id = Identifier.tryParse(target.substring(1));
+                    ResourceLocation id = ResourceLocation.tryParse(target.substring(1));
                     if (id == null) continue;
                     TagKey<Block> tag = TagKey.create(Registries.BLOCK, id);
                     isTarget = state.is(tag);
@@ -66,7 +66,7 @@ public class QuestEventHandler {
                 String target = quest.target();
 
                 if (target.startsWith("#")) {
-                    Identifier id = Identifier.tryParse(target.substring(1));
+                    ResourceLocation id = ResourceLocation.tryParse(target.substring(1));
                     if (id == null) continue;
                     TagKey<EntityType<?>> tag = TagKey.create(Registries.ENTITY_TYPE, id);
                     isTarget = killedEntity.getType().is(tag);
@@ -91,7 +91,7 @@ public class QuestEventHandler {
 
     public static void onUseEntity(ServerPlayer player, Level world, Entity entity) {
         if (entity instanceof ContainerEntity vehicle) {
-            ResourceKey<LootTable> lootKey = vehicle.getContainerLootTable();
+            ResourceKey<LootTable> lootKey = vehicle.getLootTable();
             computeOpenedChest(lootKey, player, entity);
         }
     }
@@ -101,7 +101,7 @@ public class QuestEventHandler {
 
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             BlockPos pos = player.blockPosition();
-            ServerLevel world = player.level();
+            ServerLevel world = player.serverLevel();
             HolderLookup.Provider registryManager = world.registryAccess();
 
             for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
@@ -125,13 +125,13 @@ public class QuestEventHandler {
                 }
 
                 boolean isTag = target.startsWith("#");
-                Identifier targetId = Identifier.tryParse(isTag ? target.substring(1) : target);
+                ResourceLocation targetId = ResourceLocation.tryParse(isTag ? target.substring(1) : target);
 
                 if (targetId == null) continue;
 
                 switch (quest.taskType()) {
                     case EXPLORE_DIMENSION -> {
-                        if (world.dimension().identifier().equals(targetId)) {
+                        if (world.dimension().location().equals(targetId)) {
                             requirementMet = true;
                         }
                     }
@@ -180,7 +180,7 @@ public class QuestEventHandler {
 
     private static void computeOpenedChest(ResourceKey<LootTable> lootKey, ServerPlayer player, Object entity) {
         if (lootKey != null) {
-            Identifier lootTableId = lootKey.identifier();
+            ResourceLocation lootTableId = lootKey.location();
             for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
                 if (quest.taskType() == TaskType.OPEN_LOOT_CHEST) {
                     String target = quest.target();

@@ -6,11 +6,12 @@ import fr.pacdu.pacpackquests.util.RegistryType;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.NotNull;
 
 public record RequestRegistryPayload(RegistryType registryType) implements CustomPacketPayload {
 
-    public static final Type<RequestRegistryPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(Constants.MOD_ID, "req_registry"));
+    public static final Type<RequestRegistryPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(Constants.MOD_ID, "req_registry"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, RequestRegistryPayload> CODEC = StreamCodec.of(
             (buf, value) -> {
@@ -22,7 +23,7 @@ public record RequestRegistryPayload(RegistryType registryType) implements Custo
     );
 
     @Override
-    public Type<? extends CustomPacketPayload> type() {
+    public @NotNull Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
 }

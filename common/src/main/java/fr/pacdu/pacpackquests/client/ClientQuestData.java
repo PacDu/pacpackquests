@@ -128,7 +128,7 @@ public class ClientQuestData {
         Minecraft client = Minecraft.getInstance();
         QuestDefinition quest = CLIENT_DEFINITIONS.get(payload.questId());
         if (quest != null) {
-            client.getToastManager().addToast(new QuestCompletedToast(quest));
+            client.getToasts().addToast(new QuestCompletedToast(quest));
         }
     }
 }

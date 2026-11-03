@@ -10,7 +10,7 @@ import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
@@ -81,7 +81,7 @@ public final class ItemUtils {
 
         // 1. Tag (#)
         if (itemString.startsWith("#")) {
-            Identifier tagId = Identifier.tryParse(itemString.substring(1));
+            ResourceLocation tagId = ResourceLocation.tryParse(itemString.substring(1));
             return tagId != null ? new ItemStack(TagUtils.getFirstItemInTag(tagId)) : ItemStack.EMPTY;
         }
 
@@ -99,17 +99,17 @@ public final class ItemUtils {
             }
             // Fallback to base item if components failed to parse
             int bracketIndex = itemString.indexOf('[');
-            Identifier baseId = Identifier.tryParse(itemString.substring(0, bracketIndex));
+            ResourceLocation baseId = ResourceLocation.tryParse(itemString.substring(0, bracketIndex));
             if (baseId != null && BuiltInRegistries.ITEM.containsKey(baseId)) {
-                return new ItemStack(BuiltInRegistries.ITEM.getValue(baseId));
+                return new ItemStack(BuiltInRegistries.ITEM.get(baseId));
             }
             return ItemStack.EMPTY;
         }
 
         // 3. Standard item ID
-        Identifier id = Identifier.tryParse(itemString);
+        ResourceLocation id = ResourceLocation.tryParse(itemString);
         if (id != null && BuiltInRegistries.ITEM.containsKey(id)) {
-            return new ItemStack(BuiltInRegistries.ITEM.getValue(id));
+            return new ItemStack(BuiltInRegistries.ITEM.get(id));
         }
 
         return ItemStack.EMPTY;
@@ -126,7 +126,7 @@ public final class ItemUtils {
 
         // 1. Check item tag (#)
         if (target.startsWith("#")) {
-            Identifier tagId = Identifier.tryParse(target.substring(1));
+            ResourceLocation tagId = ResourceLocation.tryParse(target.substring(1));
             return tagId != null && playerStack.is(TagKey.create(Registries.ITEM, tagId));
         }
 
@@ -144,7 +144,7 @@ public final class ItemUtils {
         }
 
         // 3. Standard item comparison
-        Identifier targetId = Identifier.tryParse(target);
+        ResourceLocation targetId = ResourceLocation.tryParse(target);
         return targetId != null && BuiltInRegistries.ITEM.getKey(playerStack.getItem()).equals(targetId);
     }
 

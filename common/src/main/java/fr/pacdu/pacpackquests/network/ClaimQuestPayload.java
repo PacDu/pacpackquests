@@ -6,10 +6,11 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.NotNull;
 
 public record ClaimQuestPayload(String questId) implements CustomPacketPayload {
-    public static final Type<ClaimQuestPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(Constants.MOD_ID, "claim_quest"));
+    public static final Type<ClaimQuestPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(Constants.MOD_ID, "claim_quest"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, ClaimQuestPayload> CODEC = StreamCodec.composite(
             ByteBufCodecs.STRING_UTF8, ClaimQuestPayload::questId,
@@ -17,7 +18,7 @@ public record ClaimQuestPayload(String questId) implements CustomPacketPayload {
     );
 
     @Override
-    public Type<? extends CustomPacketPayload> type() {
+    public @NotNull Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
 }

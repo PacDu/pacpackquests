@@ -12,7 +12,7 @@ import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.PathSecurity;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.ItemStack;
 
@@ -207,7 +207,7 @@ public class QuestManager {
                     String tTarget = tObj.has("target") ? tObj.get("target").getAsString() : "";
                     String rawTarget = tTarget.startsWith("#") ? tTarget.substring(1) : tTarget;
                     if (rawTarget.contains("[")) rawTarget = rawTarget.substring(0, rawTarget.indexOf('['));
-                    if (Identifier.tryParse(rawTarget) == null) errorMessage.append(" The target ").append(tTarget).append(" is not a valid target,");
+                    if (ResourceLocation.tryParse(rawTarget) == null) errorMessage.append(" The target ").append(tTarget).append(" is not a valid target,");
 
                     int tAmt = tObj.has("requiredAmount") ? tObj.get("requiredAmount").getAsInt() : 0;
                     if (tAmt <= 0) errorMessage.append(" Task requiredAmount must be greater than 0,");
@@ -241,10 +241,10 @@ public class QuestManager {
                             String target = rObj.has("target") ? rObj.get("target").getAsString() : "";
                             String rawReward = target.contains("[") ? target.substring(0, target.indexOf('[')) : target;
                             if (rawReward.startsWith("#")) {
-                                Identifier tagId = Identifier.tryParse(rawReward.substring(1));
+                                ResourceLocation tagId = ResourceLocation.tryParse(rawReward.substring(1));
                                 if (tagId == null) errorMessage.append(" The reward tag ").append(target).append(" is invalid,");
                             } else {
-                                Identifier rewardId = Identifier.tryParse(rawReward);
+                                ResourceLocation rewardId = ResourceLocation.tryParse(rawReward);
                                 if (rewardId == null || !BuiltInRegistries.ITEM.containsKey(rewardId)) {
                                     errorMessage.append(" The reward ").append(target).append(" does not exist,");
                                 }

@@ -6,7 +6,6 @@ import fr.pacdu.pacpackquests.client.config.ClientConfig;
 import fr.pacdu.pacpackquests.client.screen.QuestScreen;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.Identifier;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
@@ -16,7 +15,7 @@ import org.lwjgl.glfw.GLFW;
 
 public class PacPackQuestsClient {
 
-    public static final KeyMapping.Category QUEST_CATEGORY_KEY = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(Constants.MOD_ID, "keys"));
+    public static final String QUEST_CATEGORY_KEY = "key.categories." + Constants.MOD_ID;
 
     private PacPackQuestsClient() {}
 

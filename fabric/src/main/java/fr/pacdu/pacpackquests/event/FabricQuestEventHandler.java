@@ -21,7 +21,7 @@ public class FabricQuestEventHandler {
             }
         });
 
-        ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.register((world, entity, killedEntity, damageSource) -> {
+        ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.register((world, entity, killedEntity) -> {
             if (entity instanceof ServerPlayer sp) {
                 QuestEventHandler.onEntityKill(sp, killedEntity);
             }

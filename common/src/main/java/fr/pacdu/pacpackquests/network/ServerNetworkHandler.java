@@ -13,7 +13,7 @@ import fr.pacdu.pacpackquests.reward.QuestReward;
 import fr.pacdu.pacpackquests.util.PathSecurity;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,7 +34,7 @@ public class ServerNetworkHandler {
 
     private static boolean isOp(ServerPlayer player) {
         MinecraftServer server = player.level().getServer();
-        return server != null && server.getPlayerList().isOp(player.nameAndId());
+        return server != null && server.getPlayerList().isOp(player.getGameProfile());
     }
 
     public static void handleClaimQuest(ServerPlayer player, ClaimQuestPayload payload) {
@@ -251,21 +251,17 @@ public class ServerNetworkHandler {
             var structureRegistryOpt = server.registryAccess().lookup(Registries.STRUCTURE);
             if (structureRegistryOpt.isPresent()) {
                 entries = structureRegistryOpt.get().listElementIds()
-                        .map(ResourceKey::identifier)
-                        .map(Identifier::toString)
+                        .map(ResourceKey::location)
+                        .map(ResourceLocation::toString)
                         .sorted()
                         .toList();
             }
         } else if (payload.registryType() == RegistryType.LOOT_TABLE) {
-            var lookupOpt = server.reloadableRegistries().lookup().lookup(Registries.LOOT_TABLE);
-            if (lookupOpt.isPresent()) {
-                entries = lookupOpt.get().listElementIds()
-                        .map(ResourceKey::identifier)
-                        .filter(id -> id.getPath().startsWith("chests/"))
-                        .map(Identifier::toString)
-                        .sorted()
-                        .toList();
-            }
+            entries = server.reloadableRegistries().getKeys(Registries.LOOT_TABLE).stream()
+                    .filter(id -> id.getPath().startsWith("chests/"))
+                    .map(ResourceLocation::toString)
+                    .sorted()
+                    .toList();
         }
 
         Services.NETWORK.sendToPlayer(player, new SyncRegistryPayload(payload.registryType(), entries));

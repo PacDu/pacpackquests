@@ -1,6 +1,5 @@
 package fr.pacdu.pacpackquests.client.screen;
 
-import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.QuestTask;
 import fr.pacdu.pacpackquests.RewardType;
@@ -20,13 +19,11 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.TagKey;
 
@@ -307,12 +304,12 @@ public class EditQuestScreen extends Screen {
     // Validity checks are mostly handled by the selection screen now, but we keep this as a safeguard
     private boolean isValidTarget(String target, TaskType type) {
         if (target.startsWith("#")) {
-            Identifier id = Identifier.tryParse(target.substring(1));
+            ResourceLocation id = ResourceLocation.tryParse(target.substring(1));
             if (id == null) return false;
             return switch (type) {
-                case MINE_BLOCK -> BuiltInRegistries.BLOCK.get(TagKey.create(Registries.BLOCK, id)).isPresent();
-                case CRAFT_ITEM, OBTAIN_ITEM -> BuiltInRegistries.ITEM.get(TagKey.create(Registries.ITEM, id)).isPresent();
-                case KILL_MOB -> BuiltInRegistries.ENTITY_TYPE.get(TagKey.create(Registries.ENTITY_TYPE, id)).isPresent();
+                case MINE_BLOCK -> BuiltInRegistries.BLOCK.getTag(TagKey.create(Registries.BLOCK, id)).isPresent();
+                case CRAFT_ITEM, OBTAIN_ITEM -> BuiltInRegistries.ITEM.getTag(TagKey.create(Registries.ITEM, id)).isPresent();
+                case KILL_MOB -> BuiltInRegistries.ENTITY_TYPE.getTag(TagKey.create(Registries.ENTITY_TYPE, id)).isPresent();
                 case EXPLORE_BIOME -> {
                     var regOpt = Minecraft.getInstance().level.registryAccess().lookup(Registries.BIOME);
                     yield regOpt.isPresent() && regOpt.get().get(TagKey.create(Registries.BIOME, id)).isPresent();
@@ -325,11 +322,11 @@ public class EditQuestScreen extends Screen {
 
         if (target.contains("[")) {
             String baseId = target.substring(0, target.indexOf('['));
-            Identifier id = Identifier.tryParse(baseId);
+            ResourceLocation id = ResourceLocation.tryParse(baseId);
             return id != null && (type == TaskType.CRAFT_ITEM || type == TaskType.OBTAIN_ITEM) && BuiltInRegistries.ITEM.containsKey(id);
         }
 
-        Identifier id = Identifier.tryParse(target);
+        ResourceLocation id = ResourceLocation.tryParse(target);
         if (id == null) return false;
 
         return switch (type) {
@@ -343,7 +340,7 @@ public class EditQuestScreen extends Screen {
             case EXPLORE_STRUCTURE -> true;
             case EXPLORE_DIMENSION -> {
                 var handler = Minecraft.getInstance().getConnection();
-                yield handler != null && handler.levels().stream().anyMatch(key -> key.identifier().equals(id));
+                yield handler != null && handler.levels().stream().anyMatch(key -> key.location().equals(id));
             }
             case OPEN_LOOT_CHEST -> {
                 var server = Minecraft.getInstance().getSingleplayerServer();
@@ -385,7 +382,7 @@ public class EditQuestScreen extends Screen {
         }
 
         String icon = this.selectedIcon.indexOf('[') >= 0 ? this.selectedIcon.substring(0, this.selectedIcon.indexOf('[')) : this.selectedIcon;
-        if (this.selectedIcon.isEmpty() || Identifier.tryParse(icon) == null) {
+        if (this.selectedIcon.isEmpty() || ResourceLocation.tryParse(icon) == null) {
             this.errorMessage = "error.pacpackquests.invalid_icon";
             return;
         }
@@ -478,21 +475,21 @@ public class EditQuestScreen extends Screen {
     }
 
     @Override
-    public boolean mouseDragged(MouseButtonEvent click, double offsetX, double offsetY) {
-        if ((this.isTaskDropdownOpen || this.isRewardDropdownOpen) && dropdownScrollbar.mouseDragged(click.x(), click.y(), click.button(), offsetX, offsetY)) return true;
-        return super.mouseDragged(click, offsetX, offsetY);
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double offsetX, double offsetY) {
+        if ((this.isTaskDropdownOpen || this.isRewardDropdownOpen) && dropdownScrollbar.mouseDragged(mouseX, mouseY, button, offsetX, offsetY)) return true;
+        return super.mouseDragged(mouseX, mouseY, button, offsetX, offsetY);
     }
 
     @Override
-    public boolean mouseReleased(MouseButtonEvent click) {
-        if ((this.isTaskDropdownOpen || this.isRewardDropdownOpen) && dropdownScrollbar.mouseReleased(click.x(), click.y(), click.button())) return true;
-        return super.mouseReleased(click);
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if ((this.isTaskDropdownOpen || this.isRewardDropdownOpen) && dropdownScrollbar.mouseReleased(mouseX, mouseY, button)) return true;
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (this.isTaskDropdownOpen && this.taskTypeButton != null) {
-            if (handleDropdownClick(click, this.taskTypeButton, TaskType.values(), this::selectTaskType, () -> {
+            if (handleDropdownClick(mouseX, mouseY, button, this.taskTypeButton, TaskType.values(), this::selectTaskType, () -> {
                 this.isTaskDropdownOpen = false;
                 this.dropdownScrollbar.resetScroll();
             })) {
@@ -501,7 +498,7 @@ public class EditQuestScreen extends Screen {
         }
 
         if (this.isRewardDropdownOpen && this.rewardTypeButton != null) {
-            if (handleDropdownClick(click, this.rewardTypeButton, RewardType.values(), this::selectRewardType, () -> {
+            if (handleDropdownClick(mouseX, mouseY, button, this.rewardTypeButton, RewardType.values(), this::selectRewardType, () -> {
                 this.isRewardDropdownOpen = false;
                 this.dropdownScrollbar.resetScroll();
             })) {
@@ -509,40 +506,40 @@ public class EditQuestScreen extends Screen {
             }
         }
 
-        return super.mouseClicked(click, doubled);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean keyPressed(KeyEvent input) {
-        if (input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
             this.minecraft.setScreen(parent);
             return true;
         }
-        return super.keyPressed(input);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
-    private <E extends Enum<E>> boolean handleDropdownClick(MouseButtonEvent click, Button button, E[] values, Consumer<E> onSelect, Runnable closeDropdown) {
-        int dropX = button.getX();
-        int dropY = button.getY() + button.getHeight();
-        int dropWidth = button.getWidth();
+    private <E extends Enum<E>> boolean handleDropdownClick(double mouseX, double mouseY, int button, Button buttonWidget, E[] values, Consumer<E> onSelect, Runnable closeDropdown) {
+        int dropX = buttonWidget.getX();
+        int dropY = buttonWidget.getY() + buttonWidget.getHeight();
+        int dropWidth = buttonWidget.getWidth();
 
         int numOptions = values.length;
         int visibleOptions = Math.min(numOptions, MAX_DROPDOWN_VISIBLE);
         int dropHeight = 20 * visibleOptions;
 
-        if (this.dropdownScrollbar.mouseClicked(click.x(), click.y(), click.button())) {
+        if (this.dropdownScrollbar.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
 
-        if (click.x() >= dropX && click.x() < dropX + dropWidth && click.y() >= dropY && click.y() < dropY + dropHeight) {
+        if (mouseX >= dropX && mouseX < dropX + dropWidth && mouseY >= dropY && mouseY < dropY + dropHeight) {
             int taskDropdownScroll = this.dropdownScrollbar.getStepOffset();
-            int index = (int) ((taskDropdownScroll + click.y() - dropY) / 20);
+            int index = (int) ((taskDropdownScroll + mouseY - dropY) / 20);
             if (index >= 0 && index < numOptions) {
                 onSelect.accept(values[index]);
                 closeDropdown.run();
                 return true;
             }
-        } else if (!button.isMouseOver(click.x(), click.y())) {
+        } else if (!buttonWidget.isMouseOver(mouseX, mouseY)) {
             closeDropdown.run();
         }
 
@@ -630,10 +627,13 @@ public class EditQuestScreen extends Screen {
         }
     }
 
-    private <E extends Enum<E>> void drawDropdownMenu(GuiGraphics context, int mouseX, int mouseY, Button button, E[] values, String type) {
-        int dropX = button.getX();
-        int dropY = button.getY() + button.getHeight();
-        int dropWidth = button.getWidth();
+    private <E extends Enum<E>> void drawDropdownMenu(GuiGraphics context, int mouseX, int mouseY, Button buttonWidget, E[] values, String type) {
+        context.pose().pushPose();
+        context.pose().translate(0.0f, 0.0f, 300.0f); // Brings it to the foreground
+
+        int dropX = buttonWidget.getX();
+        int dropY = buttonWidget.getY() + buttonWidget.getHeight();
+        int dropWidth = buttonWidget.getWidth();
         int numOptions = values.length;
 
         int visibleOptions = Math.min(numOptions, MAX_DROPDOWN_VISIBLE);
@@ -650,13 +650,8 @@ public class EditQuestScreen extends Screen {
         context.fill(dropX - 1, dropY, dropX, dropY + dropHeight, 0xFFAAAAAA);
         context.fill(dropX + totalWidth, dropY, dropX + totalWidth + 1, dropY + dropHeight, 0xFFAAAAAA);
 
-        boolean mouseInDropdown = mouseX >= dropX && mouseX <= dropX + totalWidth && mouseY >= dropY && mouseY <= dropY + dropHeight;
-        if (mouseInDropdown) {
-            context.requestCursor(CursorTypes.ARROW);
-        }
-
         context.enableScissor(dropX, dropY, dropX + dropWidth, dropY + dropHeight);
-        context.pose().translate(0.0f, (float) -this.dropdownScrollbar.getScrollAmount());
+        context.pose().translate(0.0f, (float) -this.dropdownScrollbar.getScrollAmount(), 0.0f);
 
         for (int i = 0; i < numOptions; i++) {
             int optY = dropY + (i * 20);
@@ -665,12 +660,11 @@ public class EditQuestScreen extends Screen {
 
             if (hovered) {
                 context.fill(dropX, optY, dropX + dropWidth, optY + 20, 0xFF666666);
-                context.requestCursor(CursorTypes.POINTING_HAND);
             }
             context.drawCenteredString(this.font, Component.translatable(type + ".pacpackquests." + values[i].name().toLowerCase()), dropX + dropWidth / 2, optY + 6, 0xFFFFFFFF);
         }
 
-        context.pose().translate(0.0f, (float) this.dropdownScrollbar.getScrollAmount());
+        context.pose().translate(0.0f, (float) this.dropdownScrollbar.getScrollAmount(), 0.0f);
         context.disableScissor();
 
         this.dropdownScrollbar.setBounds(dropX + dropWidth, dropY, 6, dropHeight);
@@ -679,6 +673,8 @@ public class EditQuestScreen extends Screen {
         if (maxScroll > 0) {
             this.dropdownScrollbar.render(context, mouseX, mouseY);
         }
+
+        context.pose().popPose();
     }
 
     public void updateParents(List<String> parents) {

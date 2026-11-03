@@ -8,7 +8,6 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.PermissionSet;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
@@ -37,8 +36,8 @@ public record CommandReward(String command, String description, int amount) impl
                 .withEntity(player)
                 .withPosition(player.position())
                 .withRotation(player.getRotationVector())
-                .withLevel(player.level())
-                .withPermission(PermissionSet.ALL_PERMISSIONS)
+                .withLevel(player.serverLevel())
+                .withMaximumPermission(2)
                 .withSuppressedOutput();
 
         try {

@@ -2,60 +2,39 @@ package fr.pacdu.pacpackquests.client;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.toasts.Toast;
-import net.minecraft.client.gui.components.toasts.ToastManager;
-import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.gui.components.toasts.ToastComponent;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
+import org.jetbrains.annotations.NotNull;
 
 public class QuestCompletedToast implements Toast {
 
     // The vanilla texture used for advancements
-    private static final Identifier BACKGROUND_TEXTURE = Identifier.fromNamespaceAndPath("minecraft", "toast/advancement");
+    private static final ResourceLocation BACKGROUND_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "toast/advancement");
 
     private final QuestDefinition quest;
     private boolean soundPlayed = false;
-
-    private Visibility visibility = Visibility.SHOW;
-    private long startTime = -1;
 
     public QuestCompletedToast(QuestDefinition quest) {
         this.quest = quest;
     }
 
     @Override
-    public Visibility getWantedVisibility() {
-        return this.visibility;
-    }
-
-    @Override
-    public void update(ToastManager manager, long time) {
-        // Initialize start time on the first frame
-        if (this.startTime == -1) {
-            this.startTime = time;
-        }
-
-        // Hide the toast after 5 seconds (5000 ms)
-        if (time - this.startTime >= 5000L) {
-            this.visibility = Visibility.HIDE;
-        }
-    }
-
-    @Override
-    public void render(GuiGraphics context, Font font, long time) {
+    public @NotNull Visibility render(@NotNull GuiGraphics context, @NotNull ToastComponent toastComponent, long time) {
         // Play the satisfying achievement sound only once
-        if (!this.soundPlayed) {
-            if (Minecraft.getInstance().player != null) {
-                Minecraft.getInstance().player.playSound(SoundEvents.PLAYER_LEVELUP, 1.0F, 1.0F);
-            }
+        if (!this.soundPlayed && time > 0L) {
+            toastComponent.getMinecraft().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.0F, 1.0F));
             this.soundPlayed = true;
         }
 
-        context.blitSprite(RenderPipelines.GUI_TEXTURED, BACKGROUND_TEXTURE, 0, 0, this.width(), this.height());
+        context.blitSprite(BACKGROUND_TEXTURE, 0, 0, this.width(), this.height());
+
+        Font font = toastComponent.getMinecraft().font;
 
         // Draw Title ("Quest Completed!" in yellow)
         Component title = Component.translatable("toast.pacpackquests.completed").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD);
@@ -66,5 +45,7 @@ public class QuestCompletedToast implements Toast {
 
         // Draw the quest icon on the left side
         context.renderFakeItem(quest.icon(), 8, 8);
+
+        return (double) time >= 5000.0D * toastComponent.getNotificationDisplayTimeMultiplier() ? Visibility.HIDE : Visibility.SHOW;
     }
 }
