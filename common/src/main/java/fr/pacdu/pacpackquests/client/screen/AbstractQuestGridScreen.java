@@ -54,7 +54,7 @@ public abstract class AbstractQuestGridScreen extends Screen {
         super.init();
 
         int maxTabWidth = this.font.width("M".repeat(categoryNameMaxChars)) + 12;
-        int winWidthPx = (this.minecraft != null && this.minecraft.getWindow() != null) ? this.minecraft.getWindow().getScreenWidth() : 1920;
+        int winWidthPx = (this.minecraft != null && this.minecraft.getWindow() != null) ? this.minecraft.getWindow().getWidth() : 1920;
         float factor = Math.clamp((winWidthPx - 854f) / (1920f - 854f), 0.0f, 1.0f);
         this.tabWidth = Math.round(90 + factor * (maxTabWidth - 90));
 
