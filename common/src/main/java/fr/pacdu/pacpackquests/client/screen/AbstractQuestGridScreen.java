@@ -252,13 +252,11 @@ public abstract class AbstractQuestGridScreen extends Screen {
      * restricting it to the active bounds without exceeding the grid bounds.
      */
     private double clampAxis(double pan, int windowSize, int nodeMin, int nodeMax) {
-        double contentSize = (nodeMax - nodeMin) * zoom;
-        if (contentSize <= windowSize) {
-            return (windowSize - (nodeMin + nodeMax) * zoom) / 2.0;
-        }
+        double b1 = -nodeMin * zoom;
+        double b2 = windowSize - nodeMax * zoom;
 
-        double minPan = windowSize - nodeMax * zoom;
-        double maxPan = -nodeMin * zoom;
+        double minPan = Math.min(b1, b2);
+        double maxPan = Math.max(b1, b2);
 
         return Math.clamp(pan, minPan, maxPan);
     }
