@@ -51,7 +51,8 @@ public class ModConfig {
     public static void save() {
         try {
             if (categoryOrder.isEmpty()) categoryOrder.add(DEFAULT_CATEGORY_NAME);
-            Files.createDirectories(CONFIG_FILE.getParent());
+            Path defaultCategoryDir = Files.createDirectories(Path.of(CONFIG_FILE.getParent() + "/quests/" + DEFAULT_CATEGORY_NAME));
+            Files.createDirectories(defaultCategoryDir);
             JsonObject json = new JsonObject();
             json.add("categoryOrder", GSON.toJsonTree(categoryOrder));
 

@@ -6,6 +6,7 @@ import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.QuestTask;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
+import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.platform.Services;
 import fr.pacdu.pacpackquests.reward.*;
 import fr.pacdu.pacpackquests.util.ItemUtils;
@@ -270,6 +271,11 @@ public class QuestManager {
             errorMessage.deleteCharAt(0).insert(0, "There are errors in the json file of quest \"" + questId + "\" : ").deleteCharAt(errorMessage.length() - 1);
             Constants.LOG.warn(errorMessage.toString());
             return;
+        }
+
+        if (!ModConfig.categoryOrder.contains(category)) {
+            ModConfig.categoryOrder.add(category);
+            ModConfig.save();
         }
 
         QuestDefinition quest = new QuestDefinition(

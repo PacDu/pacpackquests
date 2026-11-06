@@ -123,6 +123,7 @@ public class ServerNetworkHandler {
         try {
             if (Files.deleteIfExists(questFile)) {
                 QuestManager.LOADED_QUESTS.remove(payload.questId());
+                QuestState.getServerState(server).deleteQuest(payload.questId());
                 Services.NETWORK.sendToAll(server, new DeleteQuestPayload(payload.questId()));
             }
         } catch (Exception e) {

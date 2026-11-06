@@ -85,56 +85,56 @@ public class PacPackQuests {
         registrar.playBidirectional(
                 DeleteQuestPayload.TYPE,
                 DeleteQuestPayload.CODEC,
-                ClientPayloadHandler::handleDeleteQuest,
                 (payload, context) -> context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer sp) {
                         ServerNetworkHandler.handleDeleteQuest(sp, payload);
                     }
-                })
+                }),
+                ClientPayloadHandler::handleDeleteQuest
         );
 
         registrar.playBidirectional(
                 CreateCategoryPayload.TYPE,
                 CreateCategoryPayload.CODEC,
-                ClientPayloadHandler::handleCreateCategory,
                 (payload, context) -> context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer sp) {
                         ServerNetworkHandler.handleCreateCategory(sp, payload);
                     }
-                })
+                }),
+                ClientPayloadHandler::handleCreateCategory
         );
 
         registrar.playBidirectional(
                 DeleteCategoryPayload.TYPE,
                 DeleteCategoryPayload.CODEC,
-                ClientPayloadHandler::handleDeleteCategory,
                 (payload, context) -> context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer sp) {
                         ServerNetworkHandler.handleDeleteCategory(sp, payload);
                     }
-                })
+                }),
+                ClientPayloadHandler::handleDeleteCategory
         );
 
         registrar.playBidirectional(
                 ReorderCategoryPayload.TYPE,
                 ReorderCategoryPayload.CODEC,
-                ClientPayloadHandler::handleReorderCategory,
                 (payload, context) -> context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer sp) {
                         ServerNetworkHandler.handleReorderCategory(sp, payload);
                     }
-                })
+                }),
+                ClientPayloadHandler::handleReorderCategory
         );
 
         registrar.playBidirectional(
                 EditCategoryPayload.TYPE,
                 EditCategoryPayload.CODEC,
-                ClientPayloadHandler::handleEditCategory,
                 (payload, context) -> context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer sp) {
                         ServerNetworkHandler.handleEditCategory(sp, payload);
                     }
-                })
+                }),
+                ClientPayloadHandler::handleEditCategory
         );
     }
 

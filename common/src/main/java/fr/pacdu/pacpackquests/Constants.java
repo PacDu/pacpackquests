@@ -20,5 +20,5 @@ public final class Constants {
     public static final Logger LOG = LoggerFactory.getLogger(MOD_NAME);
 
     /** The default category name used when no custom categories are specified. */
-    public static final String DEFAULT_CATEGORY_NAME = "Main";
+    public static final String DEFAULT_CATEGORY_NAME = "main";
 }
