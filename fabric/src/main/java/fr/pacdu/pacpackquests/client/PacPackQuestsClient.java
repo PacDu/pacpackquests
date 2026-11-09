@@ -40,6 +40,13 @@ public class PacPackQuestsClient implements ClientModInitializer {
 				QUEST_CATEGORY_KEY
 		));
 
+		ClientQuestData.toggleEditModeKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+				"key.pacpackquests.toggle-edit-mode",
+				InputConstants.Type.KEYSYM,
+				GLFW.GLFW_KEY_W,
+				QUEST_CATEGORY_KEY
+		));
+
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			while (ClientQuestData.openQuestMenuKey.consumeClick()) {
 				if (client.screen == null) {

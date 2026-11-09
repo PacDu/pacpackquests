@@ -38,7 +38,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 	private static String selectedCategory = DEFAULT_CATEGORY_NAME;
 
-	private Button claimAllButton;
+	private Button claimAllButton, editModeButton;
 	private EditBox inlineCategoryField;
 
 	// --- Edit Mode System ---
@@ -97,15 +97,14 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 		// "Edit Mode" Toggle Button (Only visible if player is OP)
 		if (Minecraft.getInstance().player != null && Minecraft.getInstance().player.hasPermissions(2)) {
-			this.addRenderableWidget(
-					Button.builder(Component.literal(I18n.get("gui.pacpackquests.edit") + ": " + (isEditMode ? "ON" : "OFF")).withStyle(isEditMode ? ChatFormatting.GREEN : ChatFormatting.RED), button -> {
-								this.isEditMode = !this.isEditMode;
-								this.rebuildWidgets(); // Refresh screen to update button text and visuals
-								this.clampPanning();
-							})
-							.bounds(startX + windowWidth - buttonWidth, startY - 25, buttonWidth, buttonHeight)
-							.build()
-			);
+			this.editModeButton =Button.builder(Component.literal(I18n.get("gui.pacpackquests.edit") + ": " + (isEditMode ? "ON" : "OFF")).withStyle(isEditMode ? ChatFormatting.GREEN : ChatFormatting.RED), button -> {
+						this.isEditMode = !this.isEditMode;
+						this.rebuildWidgets(); // Refresh screen to update button text and visuals
+						this.clampPanning();
+					})
+					.bounds(startX + windowWidth - buttonWidth, startY - 25, buttonWidth, buttonHeight)
+					.build();
+			this.addRenderableWidget(this.editModeButton);
 		}
 
 		// --- Categories Setup ---
@@ -512,7 +511,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (draggedQuestId != null) return true;
 
-		
+
 		double localMouseX = (mouseX - startX - panX) / zoom;
 		double localMouseY = (mouseY - startY - panY) / zoom;
 		boolean isMouseInWindow = isMouseInWindow(mouseX, mouseY);
@@ -832,7 +831,14 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			}
 		}
 
-		if (ClientQuestData.openQuestMenuKey != null && ClientQuestData.openQuestMenuKey.matches(keyCode, scanCode)) {
+		if (Minecraft.getInstance().player != null && Minecraft.getInstance().player.hasPermissions(2) && toggleEditModeKey != null && toggleEditModeKey.matches(keyCode, scanCode)) {
+			this.isEditMode = !this.isEditMode;
+			this.rebuildWidgets();
+			this.clampPanning();
+			return true;
+		}
+
+		if (openQuestMenuKey != null && openQuestMenuKey.matches(keyCode, scanCode)) {
 			this.onClose();
 			return true;
 		}

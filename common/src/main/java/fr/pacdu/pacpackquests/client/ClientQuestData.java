@@ -14,6 +14,7 @@ import java.util.*;
 public class ClientQuestData {
 
     public static KeyMapping openQuestMenuKey;
+    public static KeyMapping toggleEditModeKey;
     public static final Map<String, QuestDefinition> CLIENT_DEFINITIONS = new HashMap<>();
     public static final List<String> CLIENT_CATEGORIES = new ArrayList<>();
     public static final Map<String, Integer> CLIENT_PROGRESS = new HashMap<>();

@@ -73,6 +73,7 @@
 
   "key.category.pacpackquests.keys": "PacPack Quests",
   "key.pacpackquests.open-quest-menu": "Open Quest Menu",
+  "key.pacpackquests.toggle-edit-mode": "Toggle Edit Mode",
 
   "registry.pacpackquests.item": "items",
   "registry.pacpackquests.block": "blocks",
