@@ -41,7 +41,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 	private static String selectedCategory = DEFAULT_CATEGORY_NAME;
 
-	private Button claimAllButton;
+	private Button claimAllButton, editModeButton;
 	private EditBox inlineCategoryField;
 
 	// --- Edit Mode System ---
@@ -100,15 +100,14 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 		// "Edit Mode" Toggle Button (Only visible if player is OP)
 		if (Minecraft.getInstance().player != null && Minecraft.getInstance().player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
-			this.addRenderableWidget(
-					Button.builder(Component.literal(I18n.get("gui.pacpackquests.edit") + ": " + (isEditMode ? "ON" : "OFF")).withStyle(isEditMode ? ChatFormatting.GREEN : ChatFormatting.RED), button -> {
-								this.isEditMode = !this.isEditMode;
-								this.rebuildWidgets(); // Refresh screen to update button text and visuals
-								this.clampPanning();
-							})
-							.bounds(startX + windowWidth - buttonWidth, startY - 25, buttonWidth, buttonHeight)
-							.build()
-			);
+			this.editModeButton =Button.builder(Component.literal(I18n.get("gui.pacpackquests.edit") + ": " + (isEditMode ? "ON" : "OFF")).withStyle(isEditMode ? ChatFormatting.GREEN : ChatFormatting.RED), button -> {
+						this.isEditMode = !this.isEditMode;
+						this.rebuildWidgets(); // Refresh screen to update button text and visuals
+						this.clampPanning();
+					})
+					.bounds(startX + windowWidth - buttonWidth, startY - 25, buttonWidth, buttonHeight)
+					.build();
+			this.addRenderableWidget(this.editModeButton);
 		}
 
 		// --- Categories Setup ---
@@ -836,7 +835,14 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			}
 		}
 
-		if (ClientQuestData.openQuestMenuKey != null && ClientQuestData.openQuestMenuKey.matches(input)) {
+		if (Minecraft.getInstance().player != null && Minecraft.getInstance().player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER) && toggleEditModeKey != null && toggleEditModeKey.matches(input)) {
+			this.isEditMode = !this.isEditMode;
+			this.rebuildWidgets();
+			this.clampPanning();
+			return true;
+		}
+
+		if (openQuestMenuKey != null && openQuestMenuKey.matches(input)) {
 			this.onClose();
 			return true;
 		}

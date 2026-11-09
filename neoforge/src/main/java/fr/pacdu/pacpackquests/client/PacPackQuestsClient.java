@@ -28,6 +28,13 @@ public class PacPackQuestsClient {
                 QUEST_CATEGORY_KEY
         );
 
+        ClientQuestData.toggleEditModeKey = new KeyMapping(
+                "key.pacpackquests.toggle-edit-mode",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_W,
+                QUEST_CATEGORY_KEY
+        );
+
         modEventBus.addListener(PacPackQuestsClient::registerKeyMappings);
 
         NeoForge.EVENT_BUS.addListener(PacPackQuestsClient::onClientTick);
@@ -37,6 +44,7 @@ public class PacPackQuestsClient {
 
     private static void registerKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(ClientQuestData.openQuestMenuKey);
+        event.register(ClientQuestData.toggleEditModeKey);
     }
 
     private static void onClientTick(ClientTickEvent.Post event) {

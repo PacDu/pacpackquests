@@ -73,6 +73,7 @@
 
   "key.category.pacpackquests.keys": "PacPack Quests",
   "key.pacpackquests.open-quest-menu": "Ouvrir le Menu des Quêtes",
+  "key.pacpackquests.toggle-edit-mode": "Basculer le Mode Édition",
 
   "registry.pacpackquests.item": "objets",
   "registry.pacpackquests.block": "blocs",
