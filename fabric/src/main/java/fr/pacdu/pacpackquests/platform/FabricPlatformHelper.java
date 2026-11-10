@@ -2,6 +2,7 @@ package fr.pacdu.pacpackquests.platform;
 
 import fr.pacdu.pacpackquests.platform.services.IPlatformHelper;
 import net.fabricmc.loader.api.FabricLoader;
+import org.apache.commons.lang3.StringUtils;
 
 import java.nio.file.Path;
 
@@ -32,6 +33,6 @@ public class FabricPlatformHelper implements IPlatformHelper {
         if (modId.equals("c")) return "Common";
         return FabricLoader.getInstance().getModContainer(modId)
                 .map(c -> c.getMetadata().getName())
-                .orElse(modId);
+                .orElse(StringUtils.capitalize(modId));
     }
 }

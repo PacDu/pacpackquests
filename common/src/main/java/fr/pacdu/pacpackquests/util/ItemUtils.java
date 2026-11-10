@@ -4,15 +4,20 @@ import com.mojang.brigadier.StringReader;
 import fr.pacdu.pacpackquests.Constants;
 import net.minecraft.commands.arguments.item.ItemInput;
 import net.minecraft.commands.arguments.item.ItemParser;
+import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.alchemy.Potion;
+import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 
 import java.util.HashMap;
@@ -186,5 +191,35 @@ public final class ItemUtils {
             }
         }
         return true;
+    }
+
+    public static String resolveModNamespace(ItemStack stack, String fallbackNamespace) {
+        if (stack.isEmpty() || !"minecraft".equals(fallbackNamespace)) {
+            return fallbackNamespace;
+        }
+
+        // 1. Enchanted Books (stored_enchantments)
+        ItemEnchantments stored = stack.get(DataComponents.STORED_ENCHANTMENTS);
+        if (stored != null && !stored.isEmpty()) {
+            for (Holder<Enchantment> holder : stored.keySet()) {
+                Optional<ResourceKey<Enchantment>> key = holder.unwrapKey();
+                if (key.isPresent()) {
+                    String ns = key.get().location().getNamespace();
+                    if (!"minecraft".equals(ns)) return ns;
+                }
+            }
+        }
+
+        // 2. Potions & Tipped Arrows (potion_contents)
+        PotionContents potion = stack.get(DataComponents.POTION_CONTENTS);
+        if (potion != null && potion.potion().isPresent()) {
+            Optional<ResourceKey<Potion>> key = potion.potion().get().unwrapKey();
+            if (key.isPresent()) {
+                String ns = key.get().location().getNamespace();
+                if (!"minecraft".equals(ns)) return ns;
+            }
+        }
+
+        return fallbackNamespace;
     }
 }

@@ -131,7 +131,7 @@ public class SelectionScreen extends Screen {
                 // 2. Populate stacks in creative tab order
                 for (ItemStack stack : searchStacks) {
                     if (stack.isEmpty()) continue;
-                    addEntry(ItemUtils.toCommandString(stack, registries));
+                    addEntry(ItemUtils.toCommandString(stack, registries), stack, false);
                 }
 
                 // 3. Add tags last if enabled
@@ -242,6 +242,10 @@ public class SelectionScreen extends Screen {
     }
 
     private void addEntry(String idStr, boolean atFirst) {
+        addEntry(idStr, IconUtils.getRepresentativeItem(idStr, this.contextType), atFirst);
+    }
+
+    private void addEntry(String idStr, ItemStack stack, boolean atFirst) {
         if (idStr == null || idStr.isEmpty()) return;
 
         boolean isTag = idStr.startsWith("#");
@@ -252,9 +256,11 @@ public class SelectionScreen extends Screen {
 
         ResourceLocation id = ResourceLocation.tryParse(raw);
         String namespace = id != null ? id.getNamespace() : "minecraft";
+        if (this.contextType == RegistryType.ITEM) {
+            namespace = ItemUtils.resolveModNamespace(stack, namespace);
+        }
         String path = id != null ? id.getPath() : raw;
         String modName = TranslationUtils.getModName(namespace);
-        ItemStack stack = IconUtils.getRepresentativeItem(idStr, this.contextType);
         String displayName = TranslationUtils.getTranslatedName(idStr, this.contextType, this.isReward);
         String tooltip = getTooltipText(stack);
 
