@@ -87,20 +87,25 @@ public abstract class AbstractQuestGridScreen extends Screen {
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         if (mouseX >= startX && mouseX <= startX + windowWidth && mouseY >= startY && mouseY <= startY + windowHeight) {
             Bounds bounds = getActiveBounds();
-            double oldZoom = zoom;
-            zoom = Math.clamp(zoom + (float) (verticalAmount * 0.15f), getMinZoom(bounds), 2.0f);
-
-            double zoomRatio = zoom / oldZoom;
-            double relX = mouseX - startX;
-            double relY = mouseY - startY;
-
-            panX = relX - (relX - panX) * zoomRatio;
-            panY = relY - (relY - panY) * zoomRatio;
-
+            float newZoom = Math.clamp(zoom + (float) (verticalAmount * 0.15f), getMinZoom(bounds), 2.0f);
+            applyZoom(newZoom, mouseX - startX, mouseY - startY);
             clampPanning(bounds);
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    /**
+     * Adjusts the zoom level and scales panX/panY around the specified focal point (relX, relY)
+     * relative to the canvas.
+     */
+    protected void applyZoom(float targetZoom, double relX, double relY) {
+        if (Float.compare(zoom, targetZoom) != 0 && zoom > 0) {
+            double zoomRatio = (double) targetZoom / zoom;
+            panX = relX - (relX - panX) * zoomRatio;
+            panY = relY - (relY - panY) * zoomRatio;
+            zoom = targetZoom;
+        }
     }
 
     protected void clampPanning() {
@@ -108,7 +113,10 @@ public abstract class AbstractQuestGridScreen extends Screen {
     }
 
     private void clampPanning(Bounds bounds) {
-        zoom = Math.clamp(zoom, getMinZoom(bounds), 2.0f);
+        float clampedZoom = Math.clamp(zoom, getMinZoom(bounds), 2.0f);
+        if (Float.compare(zoom, clampedZoom) != 0) {
+            applyZoom(clampedZoom, windowWidth / 2.0, windowHeight / 2.0);
+        }
 
         int gridMaxX = getGridMax(canvasOffsetX, maxGridColumns);
         int gridMaxY = getGridMax(canvasOffsetY, maxGridRows);
