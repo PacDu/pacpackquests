@@ -4,6 +4,7 @@ import fr.pacdu.pacpackquests.platform.services.IPlatformHelper;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.fml.loading.FMLPaths;
+import org.apache.commons.lang3.StringUtils;
 
 import java.nio.file.Path;
 
@@ -34,6 +35,6 @@ public class NeoForgePlatformHelper implements IPlatformHelper {
         if (modId.equals("c")) return "Common";
         return ModList.get().getModContainerById(modId)
                 .map(c -> c.getModInfo().getDisplayName())
-                .orElse(modId);
+                .orElse(StringUtils.capitalize(modId));
     }
 }
