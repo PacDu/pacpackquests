@@ -223,12 +223,11 @@ public class ServerNetworkHandler {
             if (!dirFile.delete()) {
                 Constants.LOG.warn("Failed to delete category folder: {}", categoryDir);
             }
-
-            ModConfig.categoryOrder.remove(payload.category());
-            ModConfig.save();
-
-            Services.NETWORK.sendToAll(server, new DeleteCategoryPayload(payload.category()));
         }
+
+        ModConfig.categoryOrder.remove(payload.category());
+        ModConfig.save();
+        Services.NETWORK.sendToAll(server, new DeleteCategoryPayload(payload.category()));
     }
 
     public static void handleReorderCategory(ServerPlayer player, ReorderCategoryPayload payload) {
