@@ -1,5 +1,6 @@
 package fr.pacdu.pacpackquests.client.screen;
 
+import com.mojang.math.Axis;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
