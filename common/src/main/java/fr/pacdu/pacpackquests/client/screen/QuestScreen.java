@@ -198,28 +198,28 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		super.drawBackgroundFrame(context, this.title);
 
 		// --- DRAW CATEGORIES ---
-		int categMarginTop = 20;
-		int categMarginBottom = 10;
 		int categMarginY = categMarginTop + categMarginBottom;
+		int categStartY = startY + categMarginTop;
+		int categEndY = startY + windowHeight - categMarginBottom;
 
 		int tabX = startX - tabWidth;
-		int currentTabY = startY + categMarginTop;
+		int currentTabY = categStartY;
 
 		int totalTabs = CLIENT_CATEGORIES.size() + (isEditMode ? 1 : 0);
 		double totalContentHeight = totalTabs * (tabHeight + 5) - 5;
 		double maxScroll = Math.max(0, totalContentHeight - (windowHeight - categMarginY));
 		
 		int scrollX = isEditMode ? tabX - 35 : tabX - 10;
-		categoryScrollbar.setBounds(scrollX, startY + categMarginTop, 6, windowHeight - categMarginY);
+		categoryScrollbar.setBounds(scrollX, categStartY, 6, windowHeight - categMarginY);
 		categoryScrollbar.setMaxScroll(maxScroll, this.height - categMarginY);
 
 		double scrollAmount = categoryScrollbar.getScrollAmount();
 		int dropIndex = -1;
 		if (draggedCategory != null) {
-			dropIndex = Math.clamp((int) Math.round((mouseY + scrollAmount - (startY + categMarginTop)) / (tabHeight + 5.0)), 0, CLIENT_CATEGORIES.size());
+			dropIndex = Math.clamp((int) Math.round((mouseY + scrollAmount - (categStartY)) / (tabHeight + 5.0)), 0, CLIENT_CATEGORIES.size());
 		}
 
-		context.enableScissor(tabX - 40, startY + categMarginTop, startX, startY + windowHeight - categMarginBottom);
+		context.enableScissor(tabX - 40, categStartY, startX, categEndY);
 		
 		context.pose().translate(0.0f, (float) -scrollAmount);
 
@@ -228,7 +228,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 		int catIndex = 0;
 		for (String category : CLIENT_CATEGORIES) {
-			if (currentTabY + tabHeight < startY + categMarginTop + scrollAmount || currentTabY > startY + windowHeight + scrollAmount - categMarginBottom) {
+			if (currentTabY + tabHeight < categStartY + scrollAmount || currentTabY > startY + windowHeight + scrollAmount - categMarginBottom) {
 				currentTabY += tabHeight + 5;
 				catIndex++;
 				continue;
@@ -242,36 +242,36 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			// The original tab is not drawn if it is being moved
 			if (!category.equals(draggedCategory)) {
 				if (!this.inlineCategoryField.isVisible() || !category.equals(this.categoryEditTarget)) {
-					boolean isTabHovered = isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, (int)(mouseY + scrollAmount));
+					boolean isTabHovered = isHoveringTab(tabX, currentTabY, mouseX, mouseY);
 					boolean isSelected = category.equals(selectedCategory) || isTabHovered;
 					context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, isSelected ? 0xFF666666 : 0xFF333333);
 
-					String fullCategory = category.toUpperCase().replace("_", " ");
-					String displayCategory = fullCategory;
-					boolean isTruncated = false;
-					if (this.font.width(fullCategory) > maxTextWidth) {
+					String fullCategoryName = category.toUpperCase().replace("_", " ");
+					String displayCategoryName = fullCategoryName;
+					boolean isCategoryNameTruncated = false;
+					if (this.font.width(fullCategoryName) > maxTextWidth) {
 						int ellipsisWidth = this.font.width("...");
-						displayCategory = this.font.plainSubstrByWidth(fullCategory, maxTextWidth - ellipsisWidth) + "...";
-						isTruncated = true;
+						displayCategoryName = this.font.plainSubstrByWidth(fullCategoryName, maxTextWidth - ellipsisWidth) + "...";
+						isCategoryNameTruncated = true;
 					}
 
-					context.drawCenteredString(this.font, Component.literal(displayCategory), tabX + tabWidth / 2, currentTabY + 6, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA);
+					context.drawCenteredString(this.font, Component.literal(displayCategoryName), tabX + tabWidth / 2, currentTabY + 6, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA);
 
-					if (isTabHovered && isTruncated) {
-						hoveredTruncatedCategory = fullCategory;
+					if (isTabHovered && isCategoryNameTruncated) {
+						hoveredTruncatedCategory = fullCategoryName;
 					}
 				}
 
 				if (isEditMode) {
 					int delBtnX = tabX - 14;
 					int delBtnY = currentTabY + 4;
-					boolean isHoverDelBtn = isHovering(delBtnX, delBtnY, 10, 10, mouseX, (int)(mouseY + scrollAmount));
+					boolean isHoverDelBtn = isHovering(delBtnX, delBtnY, 10, 10, mouseX, mouseY + scrollAmount);
 					context.fill(delBtnX, delBtnY, delBtnX + 10, delBtnY + 10, isHoverDelBtn ? 0xFFCC1111 : 0xFF991111);
 					context.drawCenteredString(this.font, Component.literal("x").withStyle(ChatFormatting.BOLD), delBtnX + 5, delBtnY + 1, isHoverDelBtn ? 0xFFFFFFFF : 0xFFAAAAAA);
 
 					int editBtnX = delBtnX - 14;
 					int editBtnY = currentTabY + 4;
-					boolean isHoverEditBtn = isHovering(editBtnX, editBtnY, 10, 10, mouseX, (int)(mouseY + scrollAmount));
+					boolean isHoverEditBtn = isHovering(editBtnX, editBtnY, 10, 10, mouseX, mouseY + scrollAmount);
 					context.fill(editBtnX, editBtnY, editBtnX + 10, editBtnY + 10, isHoverEditBtn ? 0xFF666666 : 0xFF333333);
 					context.drawCenteredString(this.font, Component.literal("\u270E").withStyle(ChatFormatting.BOLD), editBtnX + 5, editBtnY + 1, isHoverEditBtn ? 0xFFFFFFFF : 0xFFAAAAAA);
 				}
@@ -301,7 +301,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		// --- ADD CATEGORY BUTTON / INLINE FIELD ---
 		if (isEditMode) {
 			if (!this.inlineCategoryField.isVisible() || this.categoryEditTarget != null) {
-				boolean isHover = isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, (int)(mouseY + scrollAmount));
+				boolean isHover = isHoveringTab(tabX, currentTabY, mouseX, mouseY);
 				context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, isHover ? 0xFF666666 : 0xFF444444);
 				context.drawCenteredString(this.font, Component.literal("+").withStyle(ChatFormatting.BOLD), tabX + tabWidth / 2, currentTabY + 6, isHover ? 0xFFFFFFFF : 0xFFBBBBBB);
 			}
@@ -530,11 +530,11 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			}
 
 			// Category tabs selection
-			int currentTabY = startY + 20;
+			int currentTabY = startY + categMarginTop;
 			double scrollAmount = categoryScrollbar.getScrollAmount();
 			double adjustedMouseY = mouseY + scrollAmount;
 			
-			if (mouseY >= startY + 20 && mouseY <= startY + windowHeight) {
+			if (mouseY >= startY + categMarginTop && mouseY <= startY + windowHeight - categMarginBottom) {
 				for (String category : CLIENT_CATEGORIES) {
 					int tabX = startX - tabWidth;
 
@@ -542,7 +542,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 					if (isEditMode) {
 						int delBtnX = tabX - 14;
 						int delBtnY = currentTabY + 4;
-						if (mouseX >= delBtnX && mouseX <= delBtnX + 10 && adjustedMouseY >= delBtnY && adjustedMouseY <= delBtnY + 10) {
+						if (isHovering(delBtnX, delBtnY, 10, 10, mouseX, adjustedMouseY)) {
 							this.minecraft.setScreen(new ConfirmScreen(
 									confirmed -> {
 										if (confirmed) {
@@ -558,7 +558,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 						int editBtnX = delBtnX - 14;
 						int editBtnY = currentTabY + 4;
-						if (mouseX >= editBtnX && mouseX <= editBtnX + 10 && adjustedMouseY >= editBtnY && adjustedMouseY <= editBtnY + 10) {
+						if (isHovering(editBtnX, editBtnY, 10, 10, mouseX, adjustedMouseY)) {
 							categoryEditTarget = category;
 							this.inlineCategoryField.setX(tabX);
 							this.inlineCategoryField.setWidth(tabWidth);
@@ -572,7 +572,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 					}
 
 					// 2. Normal click to change category OR prepare drag
-					if (mouseX >= tabX && mouseX <= tabX + tabWidth && adjustedMouseY >= currentTabY && adjustedMouseY <= currentTabY + tabHeight
+					if (isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, adjustedMouseY)
 							&& (!this.inlineCategoryField.isVisible() || !category.equals(this.categoryEditTarget))) {
 						if (!category.equals(selectedCategory)) {
 							saveCurrentCameraState();
@@ -592,7 +592,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 				if (isEditMode && (!this.inlineCategoryField.isVisible() || this.categoryEditTarget != null)) {
 					int tabX = startX - tabWidth;
 
-					if (mouseX >= tabX && mouseX <= tabX + tabWidth && adjustedMouseY >= currentTabY && adjustedMouseY <= currentTabY + tabHeight) {
+					if (isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, adjustedMouseY)) {
 						this.categoryEditTarget = null;
 						this.inlineCategoryField.setX(tabX);
 						this.inlineCategoryField.setWidth(tabWidth);
@@ -957,6 +957,20 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 	private boolean isMouseInWindow(double mouseX, double mouseY) {
 		return mouseX >= startX && mouseX <= startX + windowWidth && mouseY >= startY && mouseY <= startY + windowHeight;
+	}
+
+	private boolean isHoveringTab(int tabX, int tabY, double mouseX, double mouseY) {
+		int categStartY = startY + categMarginTop;
+		int categEndY = startY + windowHeight - categMarginBottom;
+		double scrollAmount = categoryScrollbar.getScrollAmount();
+		double visibleTabHeight = tabHeight;
+
+		if (tabY - scrollAmount < categStartY)
+			visibleTabHeight = tabHeight - scrollAmount % (tabHeight + 5);
+		else if (tabY + tabHeight - scrollAmount > categEndY)
+			visibleTabHeight = categEndY - (tabY - scrollAmount);
+
+		return isHovering(tabX, Math.max(tabY, categStartY + scrollAmount), tabWidth, visibleTabHeight, mouseX, mouseY + scrollAmount);
 	}
 
 	public void updateClaimButtonState() {
