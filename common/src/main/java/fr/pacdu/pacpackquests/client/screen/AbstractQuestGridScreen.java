@@ -1,6 +1,5 @@
 package fr.pacdu.pacpackquests.client.screen;
 
-import com.mojang.math.Axis;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -27,6 +26,8 @@ public abstract class AbstractQuestGridScreen extends Screen {
 
     protected int tabWidth = 90;
     protected final int tabHeight = 20;
+    protected final int categMarginTop = 20;
+    protected final int categMarginBottom = 10;
     protected final int categoryNameMaxChars = 32;
 
     protected String draggedQuestId = null;
@@ -319,7 +320,7 @@ public abstract class AbstractQuestGridScreen extends Screen {
         context.fill(x - 4, 3, x - 2, 5, color);
     }
 
-    protected boolean isHovering(int x, int y, int width, int height, double localMouseX, double localMouseY) {
+    protected boolean isHovering(double x, double y, double width, double height, double localMouseX, double localMouseY) {
         return localMouseX >= x && localMouseX <= x + width && localMouseY >= y && localMouseY <= y + height && draggedQuestId == null;
     }
 
